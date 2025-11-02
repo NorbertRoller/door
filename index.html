@@ -82,7 +82,8 @@
 
     // Write to the ESP32 LED Characteristic
     onButton.addEventListener('click', () => writeOnCharacteristic(1));
-    offButton.addEventListener('click', () => writeOnCharacteristic(0));
+    //offButton.addEventListener('click', () => writeOnCharacteristic(0));
+    offButton.addEventListener('click', () => writeOnCharacteristic("311260110777080559"));
 
     // Check if BLE is available in your Browser
     function isWebBluetoothEnabled() {
@@ -159,10 +160,16 @@
             .then(characteristic => {
                 console.log("Found the RelaySecure characteristic: ", characteristic.uuid);
                 //const data = new Uint8Array([value]);
+				
+				// Verwende den übergebenen Parameter, nicht fest "311260110777080559"
 				const encoder = new TextEncoder();
-				const data = encoder.encode("311260110777080559");
+				const data = encoder.encode(value); // <-- wichtig!
+				
 				//const data = new Uint8Array([0x31, 0x12, 0x60, 0x11, 0x07, 0x77, 0x08, 0x05, 0x59]);
                 //const data = new "311260110777080559";
+				
+				console.log("Sending bytes:", data);
+				
                 return characteristic.writeValue(data);
             })
             .then(() => {
