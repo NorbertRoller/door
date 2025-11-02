@@ -101,7 +101,8 @@
     const data = new Uint8Array(bytes);
     console.log("Bytes to send:", data);
 
-    // Jetzt An BLE schreiben
+	// Jetzt an BLE senden:
+    writeOnCharacteristic(data);  // <-- hier!
 	});
 
 
