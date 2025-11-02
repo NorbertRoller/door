@@ -59,13 +59,16 @@
     //Define BLE Device Specs
     var deviceName ='BLE2FORD';
     var bleService = 'A1DF2491-D1AC-43DB-A181-FBFE50A90B16';
-    var ledCharacteristic = 'A1DF2492-D1AC-43DB-A181-FBFE50A90B16';
-    var sensorCharacteristic= 'A1DF2493-D1AC-43DB-A181-FBFE50A90B16';
+    var pRelaySecureCharacteristic = 'A1DF2493-D1AC-43DB-A181-FBFE50A90B16';
+	//var ledCharacteristic = 'A1DF2493-D1AC-43DB-A181-FBFE50A90B16';
+    //var sensorCharacteristic= 'A1DF2492-D1AC-43DB-A181-FBFE50A90B16';
+	var pNonSecureCharacteristic= 'A1DF2492-D1AC-43DB-A181-FBFE50A90B16';
+
 
     //Global Variables to Handle Bluetooth
     var bleServer;
     var bleServiceFound;
-    var sensorCharacteristicFound;
+    var pNonSecureCharacteristicFound;
 
     // Connect Button (search for BLE Devices only if BLE is available)
     connectButton.addEventListener('click', (event) => {
@@ -114,11 +117,11 @@
         .then(service => {
             bleServiceFound = service;
             console.log("Service discovered:", service.uuid);
-            return service.getCharacteristic(sensorCharacteristic);
+            return service.getCharacteristic(pNonSecureCharacteristic);
         })
         .then(characteristic => {
             console.log("Characteristic discovered:", characteristic.uuid);
-            sensorCharacteristicFound = characteristic;
+            pNonSecureCharacteristicFound = characteristic;
             characteristic.addEventListener('characteristicvaluechanged', handleCharacteristicChange);
             characteristic.startNotifications();
             console.log("Notifications Started.");
@@ -152,7 +155,7 @@
 
     function writeOnCharacteristic(value){
         if (bleServer && bleServer.connected) {
-            bleServiceFound.getCharacteristic(ledCharacteristic)
+            bleServiceFound.getCharacteristic(pRelaySecureCharacteristic)
             .then(characteristic => {
                 console.log("Found the LED characteristic: ", characteristic.uuid);
                 const data = new Uint8Array([value]);
@@ -160,7 +163,7 @@
             })
             .then(() => {
                 latestValueSent.innerHTML = value;
-                console.log("Value written to LEDcharacteristic:", value);
+                console.log("Value written to pRelaySecureCharacteristic:", value);
             })
             .catch(error => {
                 console.error("Error writing to the LED characteristic: ", error);
@@ -174,8 +177,8 @@
     function disconnectDevice() {
         console.log("Disconnect Device.");
         if (bleServer && bleServer.connected) {
-            if (sensorCharacteristicFound) {
-                sensorCharacteristicFound.stopNotifications()
+            if (pNonSecureCharacteristicFound) {
+                pNonSecureCharacteristic.stopNotifications()
                     .then(() => {
                         console.log("Notifications Stopped");
                         return bleServer.disconnect();
