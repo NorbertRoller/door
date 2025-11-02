@@ -16,11 +16,12 @@
     <meta charset="UTF-8">
 </head>
 <body>
+	<p id="status"></p>
     <div class="topnav">
         <h1>BLE Door Web Application</h1>
     </div>
     <div class="content">
-        <div class="card-grid">
+	        <div class="card-grid">
             <div class="card">
                 <p>
                     <button id="connectBleButton" class="connectButton"> Connect to BLE Device</button>
@@ -29,28 +30,27 @@
                 <p class="gray-label">BLE state: <strong><span id="bleState" style="color:#d13a30;">Disconnected</span></strong></p>
             </div>
         </div>
+		
         <div class="card-grid">
             <div class="card">
-                <h2>Fetched Value</h2>
-                <p class="reading"><span id="valueContainer">NaN</span></p>
-                <p class="gray-label">Last reading: <span id="timestamp"></span></p>
-            </div>
-
-            <div class="card">
-                <h2>Control GPIO 2</h2>
-                <button id="onButton" class="onButton">ON</button>
-                <button id="offButton" class="offButton">OFF</button>
-                <p class="gray-label">Last value sent: <span id="valueSent"></span></p>
-            </div>
+			<p>
+			<label for="byteInput">Befehl:</label>
+			<input id="byteInput" type="text" placeholder="?                  ">
+			<button id="offButton" class="offButton">Senden</button>
+			</p>
+			</div>		
         </div>
     </div>
-</body>
+
 <script>
     // DOM Elements
     const connectButton = document.getElementById('connectBleButton');
     const disconnectButton = document.getElementById('disconnectBleButton');
-    const onButton = document.getElementById('onButton');
-    const offButton = document.getElementById('offButton');
+	const offButton = document.getElementById("offButton"); // das Button-Element
+	const byteInput = document.getElementById("byteInput");  // das Input-Element
+    
+    const status = document.getElementById("status");
+	
     const retrievedValue = document.getElementById('valueContainer');
     const latestValueSent = document.getElementById('valueSent');
     const bleStateContainer = document.getElementById('bleState');
@@ -60,9 +60,7 @@
     var deviceName ='BLE2FORD';
     var bleService = 'A1DF2491-D1AC-43DB-A181-FBFE50A90B16';
     var pRelaySecureCharacteristic = 'A1DF2493-D1AC-43DB-A181-FBFE50A90B16';
-	//var ledCharacteristic = 'A1DF2493-D1AC-43DB-A181-FBFE50A90B16';
-    //var sensorCharacteristic= 'A1DF2492-D1AC-43DB-A181-FBFE50A90B16';
-	var pNonSecureCharacteristic= 'A1DF2492-D1AC-43DB-A181-FBFE50A90B16';
+	var pNonSecureCharacteristic = 'A1DF2492-D1AC-43DB-A181-FBFE50A90B16';
 
 
     //Global Variables to Handle Bluetooth
@@ -80,10 +78,33 @@
     // Disconnect Button
     disconnectButton.addEventListener('click', disconnectDevice);
 
-    // Write to the ESP32 LED Characteristic
-    onButton.addEventListener('click', () => writeOnCharacteristic(1));
+    // Write to the ESP32 Realy Characteristic
     //offButton.addEventListener('click', () => writeOnCharacteristic(0));
-    offButton.addEventListener('click', () => writeOnCharacteristic("311260110777080559"));
+    //offButton.addEventListener('click', () => writeOnCharacteristic("311260110777080559"));
+
+	offButton.addEventListener('click', () => {
+    const input = byteInput.value.trim();
+    // Eingabe in Array von Zahlen umwandeln
+    // erlaubt: "31 12 60 11 07 77 08 05 59" oder "0x31,0x12,0x60,..."
+    let bytes = input
+        .split(/[\s,]+/)                     // nach Leerzeichen oder Kommas trennen
+        .filter(b => b.length > 0)           // leere Einträge entfernen
+        .map(b => parseInt(b, 16));          // Hex-Strings in Zahlen umwandeln
+
+    // Gültigkeit prüfen
+    if (bytes.some(isNaN)) {
+        status.textContent = "❌ Ungültige Eingabe! Bitte Hexzahlen (z. B. 31 12 60 ...) eingeben.";
+        return;
+    }
+
+    // In Uint8Array umwandeln
+    const data = new Uint8Array(bytes);
+    console.log("Bytes to send:", data);
+
+    // Jetzt An BLE schreiben
+	});
+
+
 
     // Check if BLE is available in your Browser
     function isWebBluetoothEnabled() {
@@ -228,5 +249,5 @@
 
 
 </script>
-
+</body>
 </html>
