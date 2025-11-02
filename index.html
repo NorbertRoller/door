@@ -159,7 +159,8 @@
             .then(characteristic => {
                 console.log("Found the RelaySecure characteristic: ", characteristic.uuid);
                 //const data = new Uint8Array([value]);
-				const data = encoder.encode("311260110777080559");
+				//const data = encoder.encode("311260110777080559");
+				const data = new Uint8Array([0x31, 0x12, 0x60, 0x11, 0x07, 0x77, 0x08, 0x05, 0x59]);
                 //const data = new "311260110777080559";
                 return characteristic.writeValue(data);
             })
