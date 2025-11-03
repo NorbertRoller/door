@@ -11,7 +11,7 @@
     <p id="status"></p>
     <div class="topnav">
         <h1>BLE Door Web Application</h1>
-        <p style="font-size:0.8em; color:#666;">Version 1.0.4</p>
+        <p style="font-size:0.8em; color:#666;">Version 1.1.0</p>
     </div>
 
     <div class="content">
@@ -69,13 +69,13 @@
     let pNonSecureCharacteristicFound;
 
     // Event listeners
-    connectButton.addEventListener('click', () => { if(isWebBluetoothEnabled()) connectToDevice(); });
+    connectButton.addEventListener('click', () => { if(isWebBluetoothEnabled()) manualConnect(); });
     disconnectButton.addEventListener('click', disconnectDevice);
 
     offButton.addEventListener('click', () => {
         try {
             const input = numInput.value.trim();
-            const data = stringToBytePairsCorrect(input);
+            const data = stringToBytePairsHex(input);
             console.log("Bytes to send:", data);
             latestValueSent.innerHTML = input;
             writeOnCharacteristic(data);
@@ -88,23 +88,50 @@
     function isWebBluetoothEnabled() {
         if (!navigator.bluetooth) {
             bleStateContainer.innerHTML = "Web Bluetooth API not available!";
+            bleStateContainer.style.color = "#d13a30";
             return false;
         }
         return true;
     }
 
-    // Connect to BLE Device (auto-select single device)
-    async function connectToDevice(){
+    // Auto-connect attempt
+    async function autoConnect() {
+        if (!isWebBluetoothEnabled()) return;
+        bleStateContainer.innerHTML = 'Trying auto-connect to known device ' + deviceName;
         try {
-            bleStateContainer.innerHTML = 'Requesting device...';
+            const devices = await navigator.bluetooth.getDevices();
+            const knownDevice = devices.find(d => d.name === deviceName);
+            if (knownDevice) {
+                bleDevice = knownDevice;
+                bleDevice.addEventListener('gattserverdisconnected', onDisconnected);
+                bleStateContainer.innerHTML = 'Connecting to known device ' + bleDevice.name;
+                await connectGATT();
+                return;
+            } 
+        } catch(err) {
+            console.warn('Auto-connect failed:', err);
+        }
+        bleStateContainer.innerHTML = 'Auto-connect failed, please click Connect';
+    }
+
+    // Manual connect fallback
+    async function manualConnect() {
+        try {
             bleDevice = await navigator.bluetooth.requestDevice({
                 filters: [{name: deviceName}],
                 optionalServices: [bleService]
             });
-
             bleDevice.addEventListener('gattserverdisconnected', onDisconnected);
-            bleStateContainer.innerHTML = 'Connecting to known device ' + bleDevice.name;
+            bleStateContainer.innerHTML = 'Connecting to device ' + bleDevice.name;
+            await connectGATT();
+        } catch(err) {
+            console.error("User connection failed:", err);
+            bleStateContainer.innerHTML = 'Connection failed: ' + err;
+        }
+    }
 
+    async function connectGATT() {
+        try {
             bleServer = await bleDevice.gatt.connect();
             bleServiceFound = await bleServer.getPrimaryService(bleService);
 
@@ -119,8 +146,8 @@
             bleStateContainer.innerHTML = "Connected to " + bleDevice.name;
             bleStateContainer.style.color = "#0b6623";
         } catch(err) {
-            console.error("Connection failed:", err);
-            bleStateContainer.innerHTML = "Connection failed: " + err;
+            console.error("GATT connection failed:", err);
+            bleStateContainer.innerHTML = 'Connection failed: ' + err;
             bleStateContainer.style.color = "#d13a30";
         }
     }
@@ -162,9 +189,9 @@
         return `${pad(now.getDate())}/${pad(now.getMonth()+1)}/${now.getFullYear()} at ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
     }
 
-    // Correct byte conversion: space-separated hex values
-    function stringToBytePairsCorrect(str) {
-        const parts = str.trim().split(/\s+/).filter(p => p.length > 0);
+    // Convert hex string "31 12 60 11" to bytes
+    function stringToBytePairsHex(str) {
+        const parts = str.trim().split(/\s+/);
         const bytes = [];
         for (let i = 0; i < parts.length; i++) {
             let byte = parseInt(parts[i], 16);
@@ -176,13 +203,8 @@
         return new Uint8Array(bytes);
     }
 
-    // Auto-connect if page loaded (optional)
-    window.addEventListener('load', () => {
-        if(isWebBluetoothEnabled()) {
-            // Uncomment next line to auto-connect on page load
-            // connectToDevice();
-        }
-    });
+    // Attempt auto-connect on page load
+    window.addEventListener('load', autoConnect);
 
 </script>
 </body>
