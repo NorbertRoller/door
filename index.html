@@ -58,9 +58,9 @@
 
     //Define BLE Device Specs
     var deviceName ='BLE2FORD';
-    var bleService = 'A1DF2491-D1AC-43DB-A181-FBFE50A90B16';
-    var pRelaySecureCharacteristic = 'A1DF2493-D1AC-43DB-A181-FBFE50A90B16';
-	var pNonSecureCharacteristic = 'A1DF2492-D1AC-43DB-A181-FBFE50A90B16';
+    var bleService = 'a1df2491-d1ac-43db-a181-fbfe50a90b16';
+    var pRelaySecureCharacteristic = 'a1df2493-d1ac-43db-a181-fbfe50a90b16';
+	var pNonSecureCharacteristic = 'a1df2492-d1ac-43db-a181-fbfe50a90b16';
 
 
     //Global Variables to Handle Bluetooth
@@ -87,11 +87,11 @@
     // Eingabe in Array von Zahlen umwandeln
     
     // In Bytearray konvertieren
-    const data = stringToBytePairsHex(input);
+    const data = stringToBytePairsDec(input);
     console.log("Bytes to send:", data);
 
 	// Jetzt an BLE senden:
-    writeOnCharacteristic(data);  // <-- hier!
+    writeOnCharacteristic(data);  //
 	});
 
 
@@ -144,6 +144,14 @@
 				service.getCharacteristic(pRelaySecureCharacteristic).then(c => {
 					pRelaySecureCharacteristicFound = c; // <--- NEU!
 					console.log("RelaySecure characteristic found:", c.uuid);
+					
+					// === TEST LINES START ===
+					const testData = new Uint8Array([31,12,60,11,7,77,8,5,59]);
+					pRelaySecureCharacteristicFound.writeValue(testData)
+					.then(() => console.log("Test bytes sent!"))
+						.catch(err => console.error("Test write failed:", err));
+					// === TEST LINES END ===
+				offButton.disabled = false; // Enable send button
 				})
 			]);
         })
@@ -221,11 +229,11 @@
         return datetime;
     }
 
-	function stringToBytePairsHex(str) {
+	function stringToBytePairsDec(str) {
 		const bytes = [];
 		for (let i = 0; i < str.length; i += 2) {
 			const pair = str.substr(i, 2);
-			const byte = parseInt(pair, 10); // <-- Basis 16
+			const byte = parseInt(pair, 10); // <-- Basis 10
 			if (isNaN(byte) || byte > 255) {
 				throw new Error(`Ungültiges Byte "${pair}" an Position ${i}`);
 			}
