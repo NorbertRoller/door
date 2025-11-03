@@ -11,25 +11,24 @@
     <p id="status"></p>
     <div class="topnav">
         <h1>BLE Door Web Application</h1>
-        <p id="version" style="text-align:right; color:#888;">Version 1.0.1</p>
+        <p style="font-size:0.9em;color:#888;">Version: 1.05</p> <!-- Version Label -->
     </div>
     <div class="content">
         <div class="card-grid">
             <div class="card">
                 <p>
-                    <button id="connectBleButton" class="connectButton"> Connect to BLE Device</button>
-                    <button id="disconnectBleButton" class="disconnectButton"> Disconnect BLE Device</button>
+                    <button id="connectBleButton" class="connectButton">Connect to BLE Device</button>
+                    <button id="disconnectBleButton" class="disconnectButton">Disconnect BLE Device</button>
                 </p>
                 <p class="gray-label">BLE state: <strong><span id="bleState" style="color:#d13a30;">Disconnected</span></strong></p>
             </div>
         </div>
-
         <div class="card-grid">
             <div class="card">
                 <p>
                     <label for="numInput">Befehl:</label>
-                    <input id="numInput" type="text" placeholder="?                  ">
-                    <button id="offButton" class="offButton">Senden</button>
+                    <input id="numInput" type="text" placeholder="?">
+                    <button id="offButton" class="offButton" disabled>Senden</button>
                 </p>
             </div>      
         </div>
@@ -46,112 +45,92 @@
     const bleStateContainer = document.getElementById('bleState');
 
     // BLE Specs
-    var deviceName ='BLE2FORD';
+    var deviceName = 'BLE2FORD';
     var bleService = 'a1df2491-d1ac-43db-a181-fbfe50a90b16';
     var pRelaySecureCharacteristicUUID = 'a1df2493-d1ac-43db-a181-fbfe50a90b16';
     var pRelaySecureCharacteristicFound;
     var pNonSecureCharacteristic = 'a1df2492-d1ac-43db-a181-fbfe50a90b16';
-    var pNonSecureCharacteristicFound;
-
     var bleServer;
     var bleServiceFound;
+    var pNonSecureCharacteristicFound;
 
-    // Connect Button
-    connectButton.addEventListener('click', (event) => {
-        if (isWebBluetoothEnabled()) {
-            connectToDevice();
-        }
+    // Connect
+    connectButton.addEventListener('click', () => {
+        if (navigator.bluetooth) connectToDevice();
+        else bleStateContainer.innerHTML = "Web Bluetooth API not available";
     });
 
-    // Disconnect Button
     disconnectButton.addEventListener('click', disconnectDevice);
 
-    // Send Button
+    // Write Button
     offButton.addEventListener('click', () => {
         const input = numInput.value.trim();
-        const data = stringToBytePairsDec(input);
-        console.log("Bytes to send:", data);
-        writeOnCharacteristic(data);
+        try {
+            const data = stringToBLEBytes(input);
+            console.log("Bytes to send:", data);
+            data.forEach((b, i) => console.log(`Byte[${i}]: 0x${b.toString(16).padStart(2,'0')} - ${b}`));
+            writeOnCharacteristic(data);
+        } catch (err) {
+            console.error("Error converting input:", err);
+        }
     });
 
-    function isWebBluetoothEnabled() {
-        if (!navigator.bluetooth) {
-            console.log('Web Bluetooth API is not available in this browser!');
-            bleStateContainer.innerHTML = "Web Bluetooth API is not available in this browser/device!";
-            return false;
-        }
-        console.log('Web Bluetooth API supported in this browser.');
-        return true;
-    }
-
-    async function connectToDevice() {
-        try {
-            console.log('Initializing Bluetooth...');
-            
-            // Try remembered devices first
-            let deviceList = await navigator.bluetooth.getDevices();
-            let device = deviceList.find(d => d.name === deviceName);
-
-            // If not found, show picker
-            if (!device) {
-                device = await navigator.bluetooth.requestDevice({
-                    filters: [{ name: deviceName }],
-                    optionalServices: [bleService]
-                });
-            }
-
-            console.log('Device selected:', device.name);
-            bleStateContainer.innerHTML = 'Connected to device ' + device.name;
+    // BLE Connect
+    function connectToDevice() {
+        navigator.bluetooth.requestDevice({
+            filters: [{name: deviceName}],
+            optionalServices: [bleService]
+        })
+        .then(device => {
+            bleStateContainer.innerHTML = 'Connected to ' + device.name;
             bleStateContainer.style.color = "#24af37";
-
             device.addEventListener('gattservicedisconnected', onDisconnected);
-
-            // Connect GATT
-            bleServer = await device.gatt.connect();
-            console.log("Connected to GATT Server");
-
-            bleServiceFound = await bleServer.getPrimaryService(bleService);
-            console.log("Service discovered:", bleServiceFound.uuid);
-
-            // Non-secure characteristic
-            pNonSecureCharacteristicFound = await bleServiceFound.getCharacteristic(pNonSecureCharacteristic);
-            pNonSecureCharacteristicFound.addEventListener('characteristicvaluechanged', handleCharacteristicChange);
-            await pNonSecureCharacteristicFound.startNotifications();
-
-            // Secure characteristic
-            pRelaySecureCharacteristicFound = await bleServiceFound.getCharacteristic(pRelaySecureCharacteristicUUID);
-            console.log("RelaySecure characteristic found:", pRelaySecureCharacteristicFound.uuid);
-
-            offButton.disabled = false; // enable send button
-
-        } catch (error) {
-            console.error('Connection error:', error);
-        }
+            return device.gatt.connect();
+        })
+        .then(gattServer => {
+            bleServer = gattServer;
+            return bleServer.getPrimaryService(bleService);
+        })
+        .then(service => {
+            bleServiceFound = service;
+            return Promise.all([
+                service.getCharacteristic(pNonSecureCharacteristic).then(c => {
+                    pNonSecureCharacteristicFound = c;
+                    c.addEventListener('characteristicvaluechanged', handleCharacteristicChange);
+                    return c.startNotifications();
+                }),
+                service.getCharacteristic(pRelaySecureCharacteristicUUID)
+                    .then(c => {
+                        pRelaySecureCharacteristicFound = c;
+                        console.log("RelaySecure characteristic found:", c.uuid);
+                        offButton.disabled = false;
+                    })
+            ]);
+        })
+        .catch(error => console.log('Error:', error));
     }
 
     function onDisconnected(event){
-        console.log('Device Disconnected:', event.target.device.name);
         bleStateContainer.innerHTML = "Device disconnected";
         bleStateContainer.style.color = "#d13a30";
+        console.log('Device Disconnected:', event.target.device.name);
     }
 
     function handleCharacteristicChange(event){
-        const newValueReceived = new TextDecoder().decode(event.target.value);
-        console.log("Characteristic value changed: ", newValueReceived);
+        console.log("Characteristic value changed:", new TextDecoder().decode(event.target.value));
     }
 
-    function writeOnCharacteristic(data) {
+    function writeOnCharacteristic(data){
         if (!pRelaySecureCharacteristicFound) {
             console.error("Secure characteristic not found!");
             return;
         }
         pRelaySecureCharacteristicFound.writeValue(data)
-            .then(() => console.log("Value written to characteristic:", data))
+            .then(() => console.log("Value written:", data))
             .catch(err => console.error("Write failed:", err));
     }
 
-    function disconnectDevice() {
-        console.log("Disconnect Device.");
+    function disconnectDevice(){
         if (bleServer && bleServer.connected) {
             bleServer.disconnect();
             bleStateContainer.innerHTML = "Device Disconnected";
@@ -159,22 +138,22 @@
             console.log("Device Disconnected");
         } else {
             console.warn("Bluetooth is not connected.");
-            window.alert("Bluetooth is not connected.");
         }
     }
 
-    function stringToBytePairsDec(str) {
+    function stringToBLEBytes(str) {
+        if (str.length % 2 !== 0) throw new Error("Input length must be even");
         const bytes = [];
         for (let i = 0; i < str.length; i += 2) {
             const pair = str.substr(i, 2);
             const byte = parseInt(pair, 10);
-            if (isNaN(byte) || byte > 255) {
-                throw new Error(`Ungültiges Byte "${pair}" an Position ${i}`);
-            }
+            if (isNaN(byte) || byte < 0 || byte > 255)
+                throw new Error(`Invalid byte "${pair}" at position ${i}`);
             bytes.push(byte);
         }
         return new Uint8Array(bytes);
     }
+
 </script>
 </body>
 </html>
