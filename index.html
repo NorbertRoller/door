@@ -19,7 +19,7 @@
             <div class="card">
                 <p>
                     <button id="connectBleButton" class="connectButton"> Connect to BLE Device</button>
-                    <button id="disconnectBleButton" class="disconnectButton"> Disconnect BLE Device</button>
+                    <button id="disconnectBleButton" class="disconnectButton" disabled> Disconnect BLE Device</button>
                 </p>
                 <p class="gray-label">BLE state: <strong><span id="bleState" style="color:#d13a30;">Disconnected</span></strong></p>
             </div>
@@ -30,7 +30,7 @@
                 <p>
                     <label for="numInput">Befehl:</label>
                     <input id="numInput" type="text" placeholder="?">
-                    <button id="offButton" class="offButton">Senden</button>
+                    <button id="offButton" class="offButton" disabled>Senden</button>
                 </p>
             </div>
         </div>
@@ -110,12 +110,15 @@
         .then(() => {
             bleStateContainer.innerHTML = "Connected to " + deviceName;
             bleStateContainer.style.color = "#00a000"; // green
-            offButton.disabled = false;
+            offButton.disabled = false; // enable send button
+            disconnectButton.disabled = false; // enable disconnect button
         })
         .catch(err => {
             console.error("Connection failed:", err);
             bleStateContainer.innerHTML = "Connection failed";
             bleStateContainer.style.color = "#d13a30";
+            offButton.disabled = true;
+            disconnectButton.disabled = true;
         });
     }
 
@@ -123,6 +126,7 @@
         bleStateContainer.innerHTML = "Device disconnected";
         bleStateContainer.style.color = "#d13a30";
         offButton.disabled = true;
+        disconnectButton.disabled = true; // grey out disconnect
     }
 
     function writeOnCharacteristic(data) {
@@ -138,10 +142,11 @@
     function disconnectDevice() {
         if (bleServer && bleServer.connected) {
             bleServer.disconnect();
-            bleStateContainer.innerHTML = "Device disconnected";
-            bleStateContainer.style.color = "#d13a30";
-            offButton.disabled = true;
         }
+        bleStateContainer.innerHTML = "Device disconnected";
+        bleStateContainer.style.color = "#d13a30";
+        offButton.disabled = true;
+        disconnectButton.disabled = true; // grey out disconnect
     }
 
     function stringToBytePairsHEX(str) {
