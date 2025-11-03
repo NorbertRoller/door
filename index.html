@@ -11,7 +11,7 @@
     <p id="status"></p>
     <div class="topnav">
         <h1>BLE Web Application</h1>
-        <p style="font-size:0.8em; color:#666;">Version 1.3.E</p>
+        <p style="font-size:0.8em; color:#666;">Version 1.3.F</p>
     </div>
 
     <div class="content">
@@ -28,11 +28,11 @@
         <div class="card-grid">
             <div class="card">
                 <p style="margin-bottom:8px;">
-                    <label for="numInput">Befehl:</label>
+                    <label for="numInput">Cmd:</label>
                     <input id="numInput" type="text" placeholder="?" style="width:20ch; font-family:inherit; font-size:1rem;">
                 </p>
                 <p>
-                    <button id="offButton" class="offButton">Send to Device</button>
+                    <button id="offButton" class="offButton">Send command to Device</button>
                 </p>
             </div>
         </div>
@@ -70,7 +70,7 @@
         }
     });
 
-    // Helper to set button state and color (works on Safari & Bluefy)
+    // Helper to set button state and color
     function setButtonState(button, enabled) {
         if(enabled){
             button.disabled = false;
@@ -152,6 +152,7 @@
     function onDisconnected(event){
         bleStateContainer.innerHTML = "Device disconnected";
         bleStateContainer.style.color = "#d13a30";
+        numInput.value = ""; // Clear input field on disconnect
         setButtonState(connectButton, true);
         setButtonState(disconnectButton, false);
         setButtonState(offButton, false);
