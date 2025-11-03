@@ -11,15 +11,15 @@
     <p id="status"></p>
     <div class="topnav">
         <h1>BLE Web Application</h1>
-        <p style="font-size:0.8em; color:#666;">Version 1.1.A</p>
+        <p style="font-size:0.8em; color:#666;">Version 1.3.A</p>
     </div>
 
     <div class="content">
         <div class="card-grid">
             <div class="card">
                 <p>
-                    <button id="connectBleButton" class="connectButton"> Connect to BLE Device</button>
-                    <button id="disconnectBleButton" class="disconnectButton"> Disconnect BLE Device</button>
+                    <button id="connectBleButton" class="connectButton">Connect to BLE Device</button>
+                    <button id="disconnectBleButton" class="disconnectButton disabledButton" disabled>Disconnect BLE Device</button>
                 </p>
                 <p class="gray-label">BLE state: <strong><span id="bleState" style="color:#d13a30;">Disconnected</span></strong></p>
             </div>
@@ -27,11 +27,15 @@
 
         <div class="card-grid">
             <div class="card">
-                <p>
+                <!-- Centered input row with margin to restore vertical position -->
+                <div style="display: flex; align-items: center; justify-content: center; gap: 5px; margin-top: 20px;">
                     <label for="numInput">Befehl:</label>
                     <input id="numInput" type="text" placeholder="?">
-                    <button id="offButton" class="offButton">Send to Device</button>
-                </p>
+                </div>
+                <!-- Button row, centered -->
+                <div style="margin-top: 10px; text-align: center;">
+                    <button id="offButton" class="offButton disabledButton" disabled>Send to Device</button>
+                </div>
             </div>
         </div>
     </div>
@@ -111,6 +115,9 @@
             bleStateContainer.innerHTML = "Connected to " + deviceName;
             bleStateContainer.style.color = "#00a000"; // green
             offButton.disabled = false;
+            disconnectButton.disabled = false;
+            disconnectButton.classList.remove('disabledButton');
+            offButton.classList.remove('disabledButton');
         })
         .catch(err => {
             console.error("Connection failed:", err);
@@ -123,6 +130,9 @@
         bleStateContainer.innerHTML = "Device disconnected";
         bleStateContainer.style.color = "#d13a30";
         offButton.disabled = true;
+        disconnectButton.disabled = true;
+        offButton.classList.add('disabledButton');
+        disconnectButton.classList.add('disabledButton');
     }
 
     function writeOnCharacteristic(data) {
@@ -141,6 +151,9 @@
             bleStateContainer.innerHTML = "Device disconnected";
             bleStateContainer.style.color = "#d13a30";
             offButton.disabled = true;
+            disconnectButton.disabled = true;
+            offButton.classList.add('disabledButton');
+            disconnectButton.classList.add('disabledButton');
         }
     }
 
