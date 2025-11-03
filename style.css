@@ -42,9 +42,59 @@ body {
     margin: 5px 0;
 }
 
+/* Buttons */
 button {
     color: white;
     padding: 14px 20px;
     margin: 8px 0;
     border: none;
     cursor: pointer;
+    border-radius: 4px;
+    min-width: 150px; /* Keep consistent width */
+}
+
+/* Button types */
+.connectButton {
+    background-color: #24af37;
+}
+
+.disconnectButton {
+    background-color: #d13a30;
+}
+
+.offButton {
+    background-color: #0077cc; /* blue for better visibility */
+}
+
+/* Disabled / greyed buttons */
+button:disabled {
+    background-color: #aaa !important;
+    color: #666 !important;
+    cursor: not-allowed;
+}
+
+/* Label styling */
+.gray-label {
+    color: #bebebe;
+    font-size: 1rem;
+}
+
+/* Input field styling */
+input[type="text"] {
+    font-family: inherit;
+    font-size: 1rem;
+    padding: 5px 10px;
+    width: 20ch;
+    box-sizing: border-box;
+    margin-left: 5px; /* small spacing after label */
+}
+
+/* Ensure label + input are vertically aligned */
+label {
+    vertical-align: middle;
+}
+
+/* Optional: larger text for readings (if used later) */
+.reading {
+    font-size: 1.8rem;
+}
