@@ -11,7 +11,7 @@
     <p id="status"></p>
     <div class="topnav">
         <h1>BLE Door Web Application</h1>
-        <p style="font-size:0.8em; color:#666;">Version 1.0.A</p>
+        <p style="font-size:0.8em; color:#666;">Version 1.0.B</p>
     </div>
 
     <div class="content">
@@ -124,14 +124,24 @@
         timestampContainer.innerHTML = getDateTime();
     }
 
-    function writeOnCharacteristic(data) {
-        if (!pRelaySecureCharacteristicFound) {
-            console.error("Secure characteristic not found!");
-            return;
+	function writeOnCharacteristic(data){
+        if (bleServer && bleServer.connected) {
+            bleServiceFound.getCharacteristic(pRelaySecureCharacteristicFound)
+            .then(characteristic => {
+                console.log("Found the Relay characteristic: ", characteristic.uuid);
+                return characteristic.writeValue(data);
+            })
+            .then(() => {
+                latestValueSent.innerHTML = value;
+                console.log("Value written to LEDcharacteristic:", value);
+            })
+            .catch(error => {
+                console.error("Error writing to the LED characteristic: ", error);
+            });
+        } else {
+            console.error ("Bluetooth is not connected. Cannot write to characteristic.")
+            window.alert("Bluetooth is not connected. Cannot write to characteristic. \n Connect to BLE first!")
         }
-        pRelaySecureCharacteristicFound.writeValue(data)
-            .then(() => console.log("Value written:", data))
-            .catch(err => console.error("Write failed:", err));
     }
 
     function disconnectDevice() {
