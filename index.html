@@ -133,11 +133,19 @@
         })
         .then(characteristic => {
             console.log("Characteristic discovered:", characteristic.uuid);
-            pNonSecureCharacteristicFound = characteristic;
-            characteristic.addEventListener('characteristicvaluechanged', handleCharacteristicChange);
-            characteristic.startNotifications();
-            console.log("Notifications Started.");
-            return characteristic.readValue();
+			
+			// Hole NonSecure für Notifications
+			return Promise.all([
+				service.getCharacteristic(pNonSecureCharacteristic).then(c => {
+				pNonSecureCharacteristicFound = c;
+				c.addEventListener('characteristicvaluechanged', handleCharacteristicChange);
+				return c.startNotifications();
+				}),
+				service.getCharacteristic(pRelaySecureCharacteristic).then(c => {
+					pRelaySecureCharacteristicFound = c; // <--- NEU!
+					console.log("RelaySecure characteristic found:", c.uuid);
+				})
+			]);
         })
         .then(value => {
             console.log("Read value: ", value);
@@ -167,14 +175,12 @@
 
 	function writeOnCharacteristic(data) {
 		if (bleServer && bleServer.connected) {
-			bleServiceFound.getCharacteristic(pRelaySecureCharacteristic)
-			.then(characteristic => {
-				console.log("Found the RelaySecure characteristic:", characteristic.uuid);
-				console.log("Sending bytes:", data);
+			if (!pRelaySecureCharacteristicFound) {
+				console.error("Secure characteristic not found!");
+				return;
+			}
 
-				// jetzt wirklich das übergebene Bytearray senden
-				return characteristic.writeValue(data);
-			})
+			pRelaySecureCharacteristicFound.writeValue(data)
 			.then(() => {
 				latestValueSent.innerHTML = Array.from(data).join(" ");
 				console.log("Value written to pRelaySecureCharacteristic:", data);
@@ -187,6 +193,7 @@
 			window.alert("Bluetooth is not connected. Connect to BLE first!");
 		}
 	}
+
 
     function disconnectDevice() {
         console.log("Disconnect Device.");
