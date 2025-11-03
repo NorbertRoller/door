@@ -11,7 +11,7 @@
     <p id="status"></p>
     <div class="topnav">
         <h1>BLE Door Web Application</h1>
-        <p style="font-size:0.8em; color:#666;">Version 1.0.A</p>
+        <p style="font-size:0.8em; color:#666;">Version 1.0.B</p>
     </div>
 
     <div class="content">
@@ -74,7 +74,7 @@
     offButton.addEventListener('click', () => {
         try {
             const input = numInput.value.trim();
-            const data = stringToBytePairsDec(input);
+            const data = stringToBytePairsHEX(input);
             console.log("Bytes to send:", data);
             latestValueSent.innerHTML = input;
             writeOnCharacteristic(data);
@@ -87,6 +87,7 @@
     function isWebBluetoothEnabled() {
         if (!navigator.bluetooth) {
             bleStateContainer.innerHTML = "Web Bluetooth API not available!";
+            bleStateContainer.style.color = "#d13a30";
             return false;
         }
         return true;
@@ -100,6 +101,7 @@
         })
         .then(device => {
             bleStateContainer.innerHTML = 'Connecting to ' + device.name;
+            bleStateContainer.style.color = "#d13a30";
             device.addEventListener('gattservicedisconnected', onDisconnected);
             return device.gatt.connect();
         })
@@ -120,18 +122,26 @@
                     .then(c => {
                         pRelaySecureCharacteristicFound = c;
                         console.log("Secure characteristic found:", c.uuid);
-                        offButton.disabled = false;
                     })
             ]);
         })
+        .then(() => {
+            // ✅ All characteristics ready → update BLE state
+            bleStateContainer.innerHTML = "Connected to " + deviceName;
+            bleStateContainer.style.color = "#00a000"; // green
+            offButton.disabled = false;
+        })
         .catch(err => {
             console.error("Connection failed:", err);
+            bleStateContainer.innerHTML = "Connection failed";
+            bleStateContainer.style.color = "#d13a30";
         });
     }
 
     function onDisconnected(event){
         bleStateContainer.innerHTML = "Device disconnected";
         bleStateContainer.style.color = "#d13a30";
+        offButton.disabled = true;
     }
 
     function handleCharacteristicChange(event){
@@ -155,6 +165,7 @@
             bleServer.disconnect();
             bleStateContainer.innerHTML = "Device disconnected";
             bleStateContainer.style.color = "#d13a30";
+            offButton.disabled = true;
         }
     }
 
@@ -164,13 +175,13 @@
         return `${pad(now.getDate())}/${pad(now.getMonth()+1)}/${now.getFullYear()} at ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
     }
 
-    function stringToBytePairsDec(str) {
+    function stringToBytePairsHEX(str) {
         str = str.replace(/\s+/g,''); // remove spaces
         if (str.length % 2 !== 0) throw new Error("Input must have even number of characters");
         const bytes = [];
         for (let i = 0; i < str.length; i += 2) {
             const pair = str.substr(i, 2);
-            const byte = parseInt(pair, 16); // 10 decimal conversion
+            const byte = parseInt(pair, 16); // <-- HEX conversion
             if (isNaN(byte) || byte > 255) throw new Error(`Invalid byte "${pair}" at position ${i}`);
             bytes.push(byte);
         }
@@ -179,3 +190,4 @@
 </script>
 </body>
 </html>
+
