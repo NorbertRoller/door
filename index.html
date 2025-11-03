@@ -64,12 +64,12 @@
     disconnectButton.addEventListener('click', disconnectDevice);
 
     // Send button click
-    offButton.addEventListener('click', () => {
-        const input = numInput.value.trim();
-        const data = stringToBytePairsDec(input);
-        console.log("Bytes to send:", data);
-        writeOnCharacteristic(data);
-    });
+	offButton.addEventListener('click', () => {
+		const input = numInput.value.trim();
+		const data = stringToBytePairsHex(input); // <-- Use HEX conversion
+		console.log("Bytes to send:", data);
+		writeOnCharacteristic(data);
+	});
 
     function isWebBluetoothEnabled() {
         if (!navigator.bluetooth) {
@@ -165,6 +165,24 @@
         }
         return new Uint8Array(bytes);
     }
+	
+	function stringToBytePairsHex(str) {
+    if (str.length % 2 !== 0) {
+        throw new Error("Input must have an even number of characters");
+    }
+
+    const bytes = [];
+    for (let i = 0; i < str.length; i += 2) {
+        const pair = str.substr(i, 2);
+        const byte = parseInt(pair, 16); // <-- HEX base
+        if (isNaN(byte) || byte > 255) {
+            throw new Error(`Invalid byte "${pair}" at position ${i}`);
+        }
+        bytes.push(byte);
+    }
+    return new Uint8Array(bytes);
+}
+
 </script>
 </body>
 </html>
