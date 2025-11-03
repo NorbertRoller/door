@@ -87,7 +87,7 @@
     // Eingabe in Array von Zahlen umwandeln
     
     // In Bytearray konvertieren
-    const data = stringToBytePairs(input);
+    const data = stringToBytePairsHex(input);
     console.log("Bytes to send:", data);
 
 	// Jetzt an BLE senden:
@@ -221,11 +221,11 @@
         return datetime;
     }
 
-	function stringToBytePairs(str) {
+	function stringToBytePairsHex(str) {
 		const bytes = [];
 		for (let i = 0; i < str.length; i += 2) {
 			const pair = str.substr(i, 2);
-			const byte = parseInt(pair, 16);  // <-- Basis 16!
+			const byte = parseInt(pair, 10); // <-- Basis 16
 			if (isNaN(byte) || byte > 255) {
 				throw new Error(`Ungültiges Byte "${pair}" an Position ${i}`);
 			}
