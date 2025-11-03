@@ -165,28 +165,28 @@
         timestampContainer.innerHTML = getDateTime();
     }
 
-    function writeOnCharacteristic(data){
-        if (bleServer && bleServer.connected) {
-            bleServiceFound.getCharacteristic(pRelaySecureCharacteristic)
-            .then(characteristic => {
-                console.log("Found the RelaySecure characteristic: ", characteristic.uuid);
-						
+	function writeOnCharacteristic(data) {
+		if (bleServer && bleServer.connected) {
+			bleServiceFound.getCharacteristic(pRelaySecureCharacteristic)
+			.then(characteristic => {
+				console.log("Found the RelaySecure characteristic:", characteristic.uuid);
 				console.log("Sending bytes:", data);
-				
-                return characteristic.writeValue(data);
-            })
-            .then(() => {
-                latestValueSent.innerHTML = value;
-                console.log("Value written to pRelaySecureCharacteristic:", value);
-            })
-            .catch(error => {
-                console.error("Error writing to the RelaySecure characteristic: ", error);
-            });
-        } else {
-            console.error ("Bluetooth is not connected. Cannot write to characteristic.")
-            window.alert("Bluetooth is not connected. Cannot write to characteristic. \n Connect to BLE first!")
-        }
-    }
+
+				// jetzt wirklich das übergebene Bytearray senden
+				return characteristic.writeValue(data);
+			})
+			.then(() => {
+				latestValueSent.innerHTML = Array.from(data).join(" ");
+				console.log("Value written to pRelaySecureCharacteristic:", data);
+			})
+			.catch(error => {
+				console.error("Error writing to the RelaySecure characteristic:", error);
+			});
+		} else {
+			console.error("Bluetooth is not connected. Cannot write to characteristic.");
+			window.alert("Bluetooth is not connected. Connect to BLE first!");
+		}
+	}
 
     function disconnectDevice() {
         console.log("Disconnect Device.");
