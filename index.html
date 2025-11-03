@@ -28,8 +28,8 @@
         <div class="card-grid">
             <div class="card">
                 <p>
-                    <label for="numInput">Befehl (hex bytes, space-separated):</label>
-                    <input id="numInput" type="text" placeholder="31 12 60 11 07 77 08 05 59">
+                    <label for="numInput">Befehl:</label>
+                    <input id="numInput" type="text" placeholder="?">
                     <button id="offButton" class="offButton" disabled>Senden</button>
                 </p>
             </div>
@@ -45,7 +45,6 @@
     </div>
 
 <script>
-    // DOM Elements
     const connectButton = document.getElementById('connectBleButton');
     const disconnectButton = document.getElementById('disconnectBleButton');
     const numInput = document.getElementById("numInput");
@@ -56,26 +55,24 @@
     const bleStateContainer = document.getElementById('bleState');
     const timestampContainer = document.getElementById('timestamp');
 
-    // BLE Device Specs
     const deviceName ='BLE2FORD';
     const bleService = 'a1df2491-d1ac-43db-a181-fbfe50a90b16';
     const pRelaySecureCharacteristicUUID = 'a1df2493-d1ac-43db-a181-fbfe50a90b16';
     const pNonSecureCharacteristic = 'a1df2492-d1ac-43db-a181-fbfe50a90b16';
 
-    let bleDevice;
     let bleServer;
     let bleServiceFound;
     let pRelaySecureCharacteristicFound;
     let pNonSecureCharacteristicFound;
+    let bleDevice;
 
-    // Event listeners
-    connectButton.addEventListener('click', () => { if(isWebBluetoothEnabled()) manualConnect(); });
+    connectButton.addEventListener('click', () => { if(isWebBluetoothEnabled()) connectToDevice(); });
     disconnectButton.addEventListener('click', disconnectDevice);
 
     offButton.addEventListener('click', () => {
         try {
             const input = numInput.value.trim();
-            const data = stringToBytePairsHex(input);
+            const data = stringToBytePairsDec(input);
             console.log("Bytes to send:", data);
             latestValueSent.innerHTML = input;
             writeOnCharacteristic(data);
@@ -84,70 +81,57 @@
         }
     });
 
-    // Check BLE availability
     function isWebBluetoothEnabled() {
         if (!navigator.bluetooth) {
             bleStateContainer.innerHTML = "Web Bluetooth API not available!";
-            bleStateContainer.style.color = "#d13a30";
             return false;
         }
         return true;
     }
 
-    // Auto-connect attempt
-    async function autoConnect() {
-        if (!isWebBluetoothEnabled()) return;
-        bleStateContainer.innerHTML = 'Trying auto-connect to known device ' + deviceName;
+    // Auto-connect to known device if previously paired
+    async function connectToDevice() {
+        bleStateContainer.innerHTML = "Attempting auto-connect...";
         try {
             const devices = await navigator.bluetooth.getDevices();
             const knownDevice = devices.find(d => d.name === deviceName);
-            if (knownDevice) {
+            if(knownDevice) {
                 bleDevice = knownDevice;
-                bleDevice.addEventListener('gattserverdisconnected', onDisconnected);
-                bleStateContainer.innerHTML = 'Connecting to known device ' + bleDevice.name;
-                await connectGATT();
-                return;
-            } 
-        } catch(err) {
-            console.warn('Auto-connect failed:', err);
-        }
-        bleStateContainer.innerHTML = 'Auto-connect failed, please click Connect';
-    }
+                bleStateContainer.innerHTML = "Connecting to known device " + deviceName;
+                bleDevice.addEventListener('gattservicedisconnected', onDisconnected);
+                bleServer = await bleDevice.gatt.connect();
+            } else {
+                // Fall back to manual selection
+                bleDevice = await navigator.bluetooth.requestDevice({
+                    filters: [{name: deviceName}],
+                    optionalServices: [bleService]
+                });
+                bleStateContainer.innerHTML = "Connecting to selected device " + bleDevice.name;
+                bleDevice.addEventListener('gattservicedisconnected', onDisconnected);
+                bleServer = await bleDevice.gatt.connect();
+            }
 
-    // Manual connect fallback
-    async function manualConnect() {
-        try {
-            bleDevice = await navigator.bluetooth.requestDevice({
-                filters: [{name: deviceName}],
-                optionalServices: [bleService]
-            });
-            bleDevice.addEventListener('gattserverdisconnected', onDisconnected);
-            bleStateContainer.innerHTML = 'Connecting to device ' + bleDevice.name;
-            await connectGATT();
-        } catch(err) {
-            console.error("User connection failed:", err);
-            bleStateContainer.innerHTML = 'Connection failed: ' + err;
-        }
-    }
-
-    async function connectGATT() {
-        try {
-            bleServer = await bleDevice.gatt.connect();
             bleServiceFound = await bleServer.getPrimaryService(bleService);
+            [pNonSecureCharacteristicFound, pRelaySecureCharacteristicFound] = await Promise.all([
+                bleServiceFound.getCharacteristic(pNonSecureCharacteristic)
+                    .then(c => {
+                        c.addEventListener('characteristicvaluechanged', handleCharacteristicChange);
+                        return c.startNotifications().then(() => c);
+                    }),
+                bleServiceFound.getCharacteristic(pRelaySecureCharacteristicUUID)
+                    .then(c => {
+                        console.log("Secure characteristic found:", c.uuid);
+                        offButton.disabled = false;
+                        return c;
+                    })
+            ]);
 
-            pNonSecureCharacteristicFound = await bleServiceFound.getCharacteristic(pNonSecureCharacteristic);
-            pNonSecureCharacteristicFound.addEventListener('characteristicvaluechanged', handleCharacteristicChange);
-            await pNonSecureCharacteristicFound.startNotifications();
-
-            pRelaySecureCharacteristicFound = await bleServiceFound.getCharacteristic(pRelaySecureCharacteristicUUID);
-            console.log("Secure characteristic found:", pRelaySecureCharacteristicFound.uuid);
-
-            offButton.disabled = false;
             bleStateContainer.innerHTML = "Connected to " + bleDevice.name;
-            bleStateContainer.style.color = "#0b6623";
+            bleStateContainer.style.color = "#1a8910";
+
         } catch(err) {
-            console.error("GATT connection failed:", err);
-            bleStateContainer.innerHTML = 'Connection failed: ' + err;
+            console.error("Connection failed:", err);
+            bleStateContainer.innerHTML = "Connection failed, please select device manually";
             bleStateContainer.style.color = "#d13a30";
         }
     }
@@ -155,7 +139,6 @@
     function onDisconnected(event){
         bleStateContainer.innerHTML = "Device disconnected";
         bleStateContainer.style.color = "#d13a30";
-        offButton.disabled = true;
     }
 
     function handleCharacteristicChange(event){
@@ -175,11 +158,10 @@
     }
 
     function disconnectDevice() {
-        if (bleDevice && bleDevice.gatt.connected) {
-            bleDevice.gatt.disconnect();
+        if (bleServer && bleServer.connected) {
+            bleServer.disconnect();
             bleStateContainer.innerHTML = "Device disconnected";
             bleStateContainer.style.color = "#d13a30";
-            offButton.disabled = true;
         }
     }
 
@@ -189,22 +171,18 @@
         return `${pad(now.getDate())}/${pad(now.getMonth()+1)}/${now.getFullYear()} at ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
     }
 
-    // Convert hex string "31 12 60 11" to bytes
-    function stringToBytePairsHex(str) {
-        const parts = str.trim().split(/\s+/);
+    function stringToBytePairsDec(str) {
+        str = str.replace(/\s+/g,''); // remove spaces
+        if (str.length % 2 !== 0) throw new Error("Input must have even number of characters");
         const bytes = [];
-        for (let i = 0; i < parts.length; i++) {
-            let byte = parseInt(parts[i], 16);
-            if (isNaN(byte) || byte < 0 || byte > 255) {
-                throw new Error(`Invalid byte "${parts[i]}" at position ${i}`);
-            }
+        for (let i = 0; i < str.length; i += 2) {
+            const pair = str.substr(i, 2);
+            const byte = parseInt(pair, 10); // decimal conversion
+            if (isNaN(byte) || byte > 255) throw new Error(`Invalid byte "${pair}" at position ${i}`);
             bytes.push(byte);
         }
         return new Uint8Array(bytes);
     }
-
-    // Attempt auto-connect on page load
-    window.addEventListener('load', autoConnect);
 
 </script>
 </body>
