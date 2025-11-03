@@ -34,8 +34,8 @@
         <div class="card-grid">
             <div class="card">
 			<p>
-			<label for="byteInput">Befehl:</label>
-			<input id="byteInput" type="text" placeholder="?                  ">
+			<label for="numInput">Befehl:</label>
+			<input id="numInput" type="text" placeholder="?                  ">
 			<button id="offButton" class="offButton">Senden</button>
 			</p>
 			</div>		
@@ -46,8 +46,8 @@
     // DOM Elements
     const connectButton = document.getElementById('connectBleButton');
     const disconnectButton = document.getElementById('disconnectBleButton');
+	const value = document.getElementById("numInput").value.trim();  // das Input-Element
 	const offButton = document.getElementById("offButton"); // das Button-Element
-	const byteInput = document.getElementById("byteInput");  // das Input-Element
     
     const status = document.getElementById("status");
 	
@@ -83,7 +83,7 @@
     //offButton.addEventListener('click', () => writeOnCharacteristic("311260110777080559"));
 
 	offButton.addEventListener('click', () => {
-    const input = byteInput.value.trim();
+    const input = numInput.value.trim();
     // Eingabe in Array von Zahlen umwandeln
     // erlaubt: "31 12 60 11 07 77 08 05 59" oder "0x31,0x12,0x60,..."
     let bytes = input
@@ -182,8 +182,7 @@
             .then(characteristic => {
                 console.log("Found the RelaySecure characteristic: ", characteristic.uuid);
 				
-				//const data = new Uint8Array([0x31, 0x12, 0x60, 0x11, 0x07, 0x77, 0x08, 0x05, 0x59]);
-                //const data = new "311260110777080559";
+				const data = stringToBytePairs(value);	
 				
 				console.log("Sending bytes:", data);
 				
@@ -243,6 +242,18 @@
         return datetime;
     }
 
+	function stringToBytePairs(str) {
+		const bytes = [];
+		for (let i = 0; i < str.length; i += 2) {
+			const pair = str.substr(i, 2);
+			const byte = parseInt(pair, 10);
+			if (isNaN(byte) || byte > 255) {
+				throw new Error(`Ungültiges Byte "${pair}" an Position ${i}`);
+			}
+			bytes.push(byte);
+		}
+		return new Uint8Array(bytes);
+	}
 
 </script>
 </body>
