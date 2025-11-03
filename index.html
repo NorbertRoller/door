@@ -11,7 +11,7 @@
     <p id="status"></p>
     <div class="topnav">
         <h1>BLE Door Web Application</h1>
-        <p style="font-size:0.8em; color:#666;">Version 1.0.B</p>
+        <p style="font-size:0.8em; color:#666;">Version 1.0.C</p>
     </div>
 
     <div class="content">
@@ -129,7 +129,9 @@
             bleServiceFound.getCharacteristic(pRelaySecureCharacteristicFound)
             .then(characteristic => {
                 console.log("Found the Relay characteristic: ", characteristic.uuid);
-                return characteristic.writeValue(data);
+			pRelaySecureCharacteristicFound.writeValue(data)
+            .then(() => console.log("Value written:", data))
+            .catch(err => console.error("Write failed:", err));
             })
             .then(() => {
                 latestValueSent.innerHTML = value;
