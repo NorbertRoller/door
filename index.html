@@ -225,7 +225,7 @@
 		const bytes = [];
 		for (let i = 0; i < str.length; i += 2) {
 			const pair = str.substr(i, 2);
-			const byte = parseInt(pair, 16);			// 10 == Dezimal
+			const byte = parseInt(pair, 16);  // <-- Basis 16!
 			if (isNaN(byte) || byte > 255) {
 				throw new Error(`Ungültiges Byte "${pair}" an Position ${i}`);
 			}
@@ -233,7 +233,6 @@
 		}
 		return new Uint8Array(bytes);
 	}
-
 </script>
 </body>
 </html>
