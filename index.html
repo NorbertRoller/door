@@ -11,7 +11,7 @@
     <p id="status"></p>
     <div class="topnav">
         <h1>BLE Web Application</h1>
-        <p style="font-size:0.8em; color:#666;">Version 1.3.B</p>
+        <p style="font-size:0.8em; color:#666;">Version 1.3.C</p>
     </div>
 
     <div class="content">
@@ -19,7 +19,7 @@
             <div class="card">
                 <p>
                     <button id="connectBleButton" class="connectButton">Connect to BLE Device</button>
-                    <button id="disconnectBleButton" class="disconnectButton disabledButton" disabled>Disconnect BLE Device</button>
+                    <button id="disconnectBleButton" class="disconnectButton">Disconnect BLE Device</button>
                 </p>
                 <p class="gray-label">BLE state: <strong><span id="bleState" style="color:#d13a30;">Disconnected</span></strong></p>
             </div>
@@ -27,15 +27,13 @@
 
         <div class="card-grid">
             <div class="card">
-                <!-- Centered input row with margin to restore vertical position -->
-                <div style="display: flex; align-items: center; justify-content: center; gap: 5px; margin-top: 20px;">
+                <p>
                     <label for="numInput">Befehl:</label>
                     <input id="numInput" type="text" placeholder="?">
-                </div>
-                <!-- Button row, centered -->
-                <div style="margin-top: 10px; text-align: center;">
-                    <button id="offButton" class="offButton disabledButton" disabled>Send to Device</button>
-                </div>
+                </p>
+                <p>
+                    <button id="offButton" class="offButton">Send to Device</button>
+                </p>
             </div>
         </div>
     </div>
@@ -62,7 +60,6 @@
     // Event listeners
     connectButton.addEventListener('click', () => { if(isWebBluetoothEnabled()) connectToDevice(); });
     disconnectButton.addEventListener('click', disconnectDevice);
-
     offButton.addEventListener('click', () => {
         try {
             const input = numInput.value.trim();
@@ -73,23 +70,47 @@
         }
     });
 
+    // Helper to set button state and color (works on Safari & Bluefy)
+    function setButtonState(button, enabled) {
+        if(enabled){
+            button.disabled = false;
+            button.style.backgroundColor = button.classList.contains('connectButton') ? '#24af37' :
+                                         button.classList.contains('disconnectButton') ? '#d13a30' :
+                                         '#5f6c6d';
+            button.style.color = 'white';
+            button.style.cursor = 'pointer';
+        } else {
+            button.disabled = true;
+            button.style.backgroundColor = '#aaa';
+            button.style.color = '#666';
+            button.style.cursor = 'not-allowed';
+        }
+    }
+
     function isWebBluetoothEnabled() {
         if (!navigator.bluetooth) {
             bleStateContainer.innerHTML = "Web Bluetooth API not available!";
             bleStateContainer.style.color = "#d13a30";
+            setButtonState(connectButton, false);
+            setButtonState(disconnectButton, false);
+            setButtonState(offButton, false);
             return false;
         }
         return true;
     }
 
     function connectToDevice(){
+        setButtonState(connectButton, false);
+        setButtonState(disconnectButton, false);
+        setButtonState(offButton, false);
+        bleStateContainer.innerHTML = 'Connecting to ' + deviceName;
+        bleStateContainer.style.color = "#d13a30";
+
         navigator.bluetooth.requestDevice({
             filters: [{name: deviceName}],
             optionalServices: [bleService]
         })
         .then(device => {
-            bleStateContainer.innerHTML = 'Connecting to ' + device.name;
-            bleStateContainer.style.color = "#d13a30";
             device.addEventListener('gattservicedisconnected', onDisconnected);
             return device.gatt.connect();
         })
@@ -114,25 +135,26 @@
         .then(() => {
             bleStateContainer.innerHTML = "Connected to " + deviceName;
             bleStateContainer.style.color = "#00a000"; // green
-            offButton.disabled = false;
-            disconnectButton.disabled = false;
-            disconnectButton.classList.remove('disabledButton');
-            offButton.classList.remove('disabledButton');
+            setButtonState(connectButton, false);
+            setButtonState(disconnectButton, true);
+            setButtonState(offButton, true);
         })
         .catch(err => {
             console.error("Connection failed:", err);
             bleStateContainer.innerHTML = "Connection failed";
             bleStateContainer.style.color = "#d13a30";
+            setButtonState(connectButton, true);
+            setButtonState(disconnectButton, false);
+            setButtonState(offButton, false);
         });
     }
 
     function onDisconnected(event){
         bleStateContainer.innerHTML = "Device disconnected";
         bleStateContainer.style.color = "#d13a30";
-        offButton.disabled = true;
-        disconnectButton.disabled = true;
-        offButton.classList.add('disabledButton');
-        disconnectButton.classList.add('disabledButton');
+        setButtonState(connectButton, true);
+        setButtonState(disconnectButton, false);
+        setButtonState(offButton, false);
     }
 
     function writeOnCharacteristic(data) {
@@ -148,13 +170,8 @@
     function disconnectDevice() {
         if (bleServer && bleServer.connected) {
             bleServer.disconnect();
-            bleStateContainer.innerHTML = "Device disconnected";
-            bleStateContainer.style.color = "#d13a30";
-            offButton.disabled = true;
-            disconnectButton.disabled = true;
-            offButton.classList.add('disabledButton');
-            disconnectButton.classList.add('disabledButton');
         }
+        onDisconnected();
     }
 
     function stringToBytePairsHEX(str) {
@@ -169,6 +186,12 @@
         }
         return new Uint8Array(bytes);
     }
+
+    // Initialize all buttons as disabled on load
+    setButtonState(connectButton, true);
+    setButtonState(disconnectButton, false);
+    setButtonState(offButton, false);
+
 </script>
 </body>
 </html>
