@@ -10,7 +10,7 @@
 <body>
     <div class="topnav">
         <h1>BLE Door Web Application</h1>
-        <p style="font-size:0.8em; color:#666;">Version 1.0.6</p>
+        <p style="font-size:0.8em; color:#666;">Version 1.0.7</p>
     </div>
 
     <div class="content">
@@ -117,11 +117,13 @@ async function setupServer(server) {
     pNonSecureCharacteristicFound.addEventListener('characteristicvaluechanged', handleCharacteristicChange);
     await pNonSecureCharacteristicFound.startNotifications();
 
-    // Secure write characteristic (critical!)
+    // Secure write characteristic
     pRelaySecureCharacteristicFound = await service.getCharacteristic(pRelaySecureCharacteristicUUID);
     console.log("Secure characteristic ready:", pRelaySecureCharacteristicFound.uuid);
 
+    // ENABLE SEND BUTTON ONLY AFTER SECURE CHAR IS READY
     offButton.disabled = false;
+
     bleStateContainer.innerHTML = "Connected to " + deviceName;
     bleStateContainer.style.color = "#00a000";
 }
@@ -143,7 +145,7 @@ function handleCharacteristicChange(event) {
 // ---------------- Write function (iOS-safe) ----------------
 function writeOnCharacteristic(data) {
     if(!pRelaySecureCharacteristicFound) {
-        console.error("Secure characteristic not found!");
+        alert("Cannot send: secure characteristic not ready");
         return;
     }
 
