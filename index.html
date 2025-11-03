@@ -11,7 +11,7 @@
     <p id="status"></p>
     <div class="topnav">
         <h1>BLE Door Web Application</h1>
-        <p style="font-size:0.8em; color:#666;">Version 1.0.0</p>
+        <p style="font-size:0.8em; color:#666;">Version 1.0.A</p>
     </div>
 
     <div class="content">
@@ -170,7 +170,7 @@
         const bytes = [];
         for (let i = 0; i < str.length; i += 2) {
             const pair = str.substr(i, 2);
-            const byte = parseInt(pair, 10); // decimal conversion
+            const byte = parseInt(pair, 16); // 10 decimal conversion
             if (isNaN(byte) || byte > 255) throw new Error(`Invalid byte "${pair}" at position ${i}`);
             bytes.push(byte);
         }
