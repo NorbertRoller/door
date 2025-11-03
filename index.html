@@ -11,15 +11,15 @@
     <p id="status"></p>
     <div class="topnav">
         <h1>BLE Door Web Application</h1>
-        <p style="font-size:0.8em; color:#666;">Version 1.0.2</p>
+        <p style="font-size:0.8em; color:#666;">Version 1.0.3</p>
     </div>
 
     <div class="content">
         <div class="card-grid">
             <div class="card">
                 <p>
-                    <button id="connectBleButton" class="connectButton"> Connect to BLE Device</button>
-                    <button id="disconnectBleButton" class="disconnectButton"> Disconnect BLE Device</button>
+                    <button id="connectBleButton" class="connectButton">Connect to BLE Device</button>
+                    <button id="disconnectBleButton" class="disconnectButton">Disconnect BLE Device</button>
                 </p>
                 <p class="gray-label">BLE state: <strong><span id="bleState" style="color:#d13a30;">Disconnected</span></strong></p>
             </div>
@@ -29,7 +29,7 @@
             <div class="card">
                 <p>
                     <label for="numInput">Befehl:</label>
-                    <input id="numInput" type="text" placeholder="?">
+                    <input id="numInput" type="text" placeholder="311260110777080559">
                     <button id="offButton" class="offButton" disabled>Senden</button>
                 </p>
             </div>
@@ -50,14 +50,13 @@
     const disconnectButton = document.getElementById('disconnectBleButton');
     const numInput = document.getElementById("numInput");
     const offButton = document.getElementById("offButton");
-    const status = document.getElementById("status");
     const retrievedValue = document.getElementById('valueContainer');
     const latestValueSent = document.getElementById('valueSent');
     const bleStateContainer = document.getElementById('bleState');
     const timestampContainer = document.getElementById('timestamp');
 
     // BLE Device Specs
-    const deviceName ='BLE2FORD';
+    const deviceName = 'BLE2FORD';
     const bleService = 'a1df2491-d1ac-43db-a181-fbfe50a90b16';
     const pRelaySecureCharacteristicUUID = 'a1df2493-d1ac-43db-a181-fbfe50a90b16';
     const pNonSecureCharacteristic = 'a1df2492-d1ac-43db-a181-fbfe50a90b16';
@@ -68,18 +67,19 @@
     let pNonSecureCharacteristicFound;
 
     // Event listeners
-    connectButton.addEventListener('click', () => { if(isWebBluetoothEnabled()) connectToDeviceManual(); });
+    connectButton.addEventListener('click', () => { if (isWebBluetoothEnabled()) connectToDeviceManual(); });
     disconnectButton.addEventListener('click', disconnectDevice);
 
     offButton.addEventListener('click', () => {
         try {
             const input = numInput.value.trim();
-            const data = stringToBytePairsDec(input);
+            const data = stringToBytePairsHex(input);
             console.log("Bytes to send:", data);
             latestValueSent.innerHTML = input;
             writeOnCharacteristic(data);
-        } catch(e) {
+        } catch (e) {
             console.error(e.message);
+            alert("Error: " + e.message);
         }
     });
 
@@ -104,10 +104,9 @@
                 const server = await knownDevice.gatt.connect();
                 await setupServer(server);
                 return;
-            } 
-            // If no known device, fallback
+            }
             connectToDeviceManual();
-        } catch(err) {
+        } catch (err) {
             console.error("Auto-connect failed:", err);
             bleStateContainer.innerHTML = "Auto-connect failed, please select device manually.";
             connectToDeviceManual();
@@ -117,7 +116,7 @@
     // Manual connection with user prompt
     function connectToDeviceManual() {
         navigator.bluetooth.requestDevice({
-            filters: [{name: deviceName}],
+            filters: [{ name: deviceName }],
             optionalServices: [bleService]
         })
         .then(device => {
@@ -151,13 +150,13 @@
         bleStateContainer.style.color = "#00a000";
     }
 
-    function onDisconnected(event){
+    function onDisconnected(event) {
         bleStateContainer.innerHTML = "Device disconnected";
         bleStateContainer.style.color = "#d13a30";
         offButton.disabled = true;
     }
 
-    function handleCharacteristicChange(event){
+    function handleCharacteristicChange(event) {
         const newValue = new TextDecoder().decode(event.target.value);
         retrievedValue.innerHTML = newValue;
         timestampContainer.innerHTML = getDateTime();
@@ -184,19 +183,19 @@
 
     function getDateTime() {
         const now = new Date();
-        const pad = n => String(n).padStart(2,'0');
-        return `${pad(now.getDate())}/${pad(now.getMonth()+1)}/${now.getFullYear()} at ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+        const pad = n => String(n).padStart(2, '0');
+        return `${pad(now.getDate())}/${pad(now.getMonth() + 1)}/${now.getFullYear()} at ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
     }
 
-    // Correct decimal conversion from v1.0.0
-    function stringToBytePairsDec(str) {
-        str = str.replace(/\s+/g,''); // remove spaces
+    // ✅ Correct hexadecimal conversion (replaces v1.0.2 decimal version)
+    function stringToBytePairsHex(str) {
+        str = str.replace(/\s+/g, ''); // remove spaces
         if (str.length % 2 !== 0) throw new Error("Input must have even number of characters");
         const bytes = [];
         for (let i = 0; i < str.length; i += 2) {
             const pair = str.substr(i, 2);
-            const byte = parseInt(pair, 10); // decimal conversion
-            if (isNaN(byte) || byte > 255) throw new Error(`Invalid byte "${pair}" at position ${i}`);
+            const byte = parseInt(pair, 16); // HEX conversion
+            if (isNaN(byte)) throw new Error(`Invalid hex byte "${pair}" at position ${i}`);
             bytes.push(byte);
         }
         return new Uint8Array(bytes);
@@ -204,7 +203,7 @@
 
     // Auto-connect attempt on page load
     window.addEventListener('load', () => {
-        if(isWebBluetoothEnabled()) connectToDeviceAuto();
+        if (isWebBluetoothEnabled()) connectToDeviceAuto();
     });
 </script>
 </body>
