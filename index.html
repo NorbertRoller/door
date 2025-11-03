@@ -46,7 +46,7 @@
     // DOM Elements
     const connectButton = document.getElementById('connectBleButton');
     const disconnectButton = document.getElementById('disconnectBleButton');
-	//const value = document.getElementById("numInput").value.trim();  // das Input-Element
+	const numInput = document.getElementById("numInput"); // das Input-Element
 	const offButton = document.getElementById("offButton"); // das Button-Element
     
     const status = document.getElementById("status");
@@ -170,9 +170,7 @@
             bleServiceFound.getCharacteristic(pRelaySecureCharacteristic)
             .then(characteristic => {
                 console.log("Found the RelaySecure characteristic: ", characteristic.uuid);
-				
-				const data = stringToBytePairs(value);	
-				
+						
 				console.log("Sending bytes:", data);
 				
                 return characteristic.writeValue(data);
