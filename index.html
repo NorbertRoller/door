@@ -85,20 +85,9 @@
 	offButton.addEventListener('click', () => {
     const input = numInput.value.trim();
     // Eingabe in Array von Zahlen umwandeln
-    // erlaubt: "31 12 60 11 07 77 08 05 59" oder "0x31,0x12,0x60,..."
-    let bytes = input
-        .split(/[\s,]+/)                     // nach Leerzeichen oder Kommas trennen
-        .filter(b => b.length > 0)           // leere Einträge entfernen
-        .map(b => parseInt(b, 16));          // Hex-Strings in Zahlen umwandeln
-
-    // Gültigkeit prüfen
-    if (bytes.some(isNaN)) {
-        status.textContent = "❌ Ungültige Eingabe! Bitte Hexzahlen (z. B. 31 12 60 ...) eingeben.";
-        return;
-    }
-
-    // In Uint8Array umwandeln
-    const data = new Uint8Array(bytes);
+    
+    // In Bytearray konvertieren
+    const data = stringToBytePairs(input);
     console.log("Bytes to send:", data);
 
 	// Jetzt an BLE senden:
