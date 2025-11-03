@@ -195,33 +195,18 @@
 	}
 
 
-    function disconnectDevice() {
-        console.log("Disconnect Device.");
-        if (bleServer && bleServer.connected) {
-            if (pNonSecureCharacteristicFound) {
-                pNonSecureCharacteristic.stopNotifications()
-                    .then(() => {
-                        console.log("Notifications Stopped");
-                        return bleServer.disconnect();
-                    })
-                    .then(() => {
-                        console.log("Device Disconnected");
-                        bleStateContainer.innerHTML = "Device Disconnected";
-                        bleStateContainer.style.color = "#d13a30";
-
-                    })
-                    .catch(error => {
-                        console.log("An error occurred:", error);
-                    });
-            } else {
-                console.log("No characteristic found to disconnect.");
-            }
-        } else {
-            // Throw an error if Bluetooth is not connected
-            console.error("Bluetooth is not connected.");
-            window.alert("Bluetooth is not connected.")
-        }
-    }
+	function disconnectDevice() {
+		console.log("Disconnect Device.");
+		if (bleServer && bleServer.connected) {
+			bleServer.disconnect();
+			bleStateContainer.innerHTML = "Device Disconnected";
+			bleStateContainer.style.color = "#d13a30";
+			console.log("Device Disconnected");
+		} else {
+			console.warn("Bluetooth is not connected.");
+			window.alert("Bluetooth is not connected.");
+		}
+	}
 
     function getDateTime() {
         var currentdate = new Date();
@@ -240,7 +225,7 @@
 		const bytes = [];
 		for (let i = 0; i < str.length; i += 2) {
 			const pair = str.substr(i, 2);
-			const byte = parseInt(pair, 10);
+			const byte = parseInt(pair, 16);			// 10 == Dezimal
 			if (isNaN(byte) || byte > 255) {
 				throw new Error(`Ungültiges Byte "${pair}" an Position ${i}`);
 			}
