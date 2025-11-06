@@ -11,7 +11,7 @@
     <p id="status"></p>
     <div class="topnav">
         <h1>BLE Web Application</h1>
-        <p style="font-size:0.8em; color:#666;">Version 1.3.F</p>
+        <p style="font-size:0.8em; color:#666;">Version 1.3.G</p>
     </div>
 
     <div class="content">
@@ -47,7 +47,7 @@
     const bleStateContainer = document.getElementById('bleState');
 
     // BLE Device Specs
-    const deviceName ='BLE2FORD';
+    const deviceName = 'BLE2FORD';
     const bleService = 'a1df2491-d1ac-43db-a181-fbfe50a90b16';
     const pRelaySecureCharacteristicUUID = 'a1df2493-d1ac-43db-a181-fbfe50a90b16';
     const pNonSecureCharacteristic = 'a1df2492-d1ac-43db-a181-fbfe50a90b16';
@@ -57,22 +57,28 @@
     let pRelaySecureCharacteristicFound;
     let pNonSecureCharacteristicFound;
 
+    // Restrict input to printable ASCII (0x21–0x7E)
+    numInput.addEventListener("input", () => {
+        numInput.value = numInput.value
+            .split('')
+            .filter(ch => ch.charCodeAt(0) >= 0x21 && ch.charCodeAt(0) <= 0x7E)
+            .join('');
+    });
+
     // Event listeners
-    connectButton.addEventListener('click', () => { if(isWebBluetoothEnabled()) connectToDevice(); });
+    connectButton.addEventListener('click', () => { if (isWebBluetoothEnabled()) connectToDevice(); });
     disconnectButton.addEventListener('click', disconnectDevice);
     offButton.addEventListener('click', () => {
-        try {
-            const input = numInput.value.trim();
-            const data = stringToBytePairsHEX(input);
-            writeOnCharacteristic(data);
-        } catch(e) {
-            console.error(e.message);
-        }
+        const input = numInput.value.trim();
+        if (!input) return;
+        const data = new TextEncoder().encode(input); // Convert to ASCII bytes
+        console.log("Sending ASCII:", input, Array.from(data).map(b => b.toString(16).padStart(2, '0')).join(' '));
+        writeOnCharacteristic(data);
     });
 
     // Helper to set button state and color
     function setButtonState(button, enabled) {
-        if(enabled){
+        if (enabled) {
             button.disabled = false;
             button.style.backgroundColor = button.classList.contains('connectButton') ? '#24af37' :
                                          button.classList.contains('disconnectButton') ? '#d13a30' :
@@ -99,7 +105,7 @@
         return true;
     }
 
-    function connectToDevice(){
+    function connectToDevice() {
         setButtonState(connectButton, false);
         setButtonState(disconnectButton, false);
         setButtonState(offButton, false);
@@ -107,7 +113,7 @@
         bleStateContainer.style.color = "#d13a30";
 
         navigator.bluetooth.requestDevice({
-            filters: [{name: deviceName}],
+            filters: [{ name: deviceName }],
             optionalServices: [bleService]
         })
         .then(device => {
@@ -149,7 +155,7 @@
         });
     }
 
-    function onDisconnected(event){
+    function onDisconnected(event) {
         bleStateContainer.innerHTML = "Device disconnected";
         bleStateContainer.style.color = "#d13a30";
         numInput.value = ""; // Clear input field on disconnect
@@ -175,24 +181,10 @@
         onDisconnected();
     }
 
-    function stringToBytePairsHEX(str) {
-        str = str.replace(/\s+/g,''); // remove spaces
-        if (str.length % 2 !== 0) throw new Error("Input must have even number of characters");
-        const bytes = [];
-        for (let i = 0; i < str.length; i += 2) {
-            const pair = str.substr(i, 2);
-            const byte = parseInt(pair, 16);
-            if (isNaN(byte) || byte > 255) throw new Error(`Invalid byte "${pair}" at position ${i}`);
-            bytes.push(byte);
-        }
-        return new Uint8Array(bytes);
-    }
-
     // Initialize all buttons as disabled on load
     setButtonState(connectButton, true);
     setButtonState(disconnectButton, false);
     setButtonState(offButton, false);
-
 </script>
 </body>
 </html>
