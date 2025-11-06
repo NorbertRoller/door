@@ -6,12 +6,58 @@
     <link rel="icon" type="image/png" href="favicon.ico">
     <link rel="stylesheet" type="text/css" href="style.css">
     <meta charset="UTF-8">
+    <style>
+        /* Modal Styles */
+        .modal {
+            display: none; 
+            position: fixed; 
+            z-index: 1000; 
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.5);
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: 10% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 90%;
+            max-width: 400px;
+            border-radius: 8px;
+        }
+        .modal input {
+            width: 100%;
+            padding: 6px;
+            margin: 6px 0;
+            box-sizing: border-box;
+            font-family: inherit;
+            font-size: 1rem;
+        }
+        .modal button {
+            margin: 6px 4px 0 0;
+            padding: 6px 12px;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+        #setupIcon {
+            float: right;
+            cursor: pointer;
+            font-size: 1.5em;
+            color: #555;
+        }
+        #setupIcon:hover {
+            color: #000;
+        }
+    </style>
 </head>
 <body>
     <p id="status"></p>
     <div class="topnav">
-        <h1>BLE Web Application</h1>
-        <p style="font-size:0.8em; color:#666;">Version 1.3.H</p>
+        <h1>BLE Web Application <span id="setupIcon">&#9881;</span></h1>
+        <p style="font-size:0.8em; color:#666;">Version 1.3.J</p>
     </div>
 
     <div class="content">
@@ -29,12 +75,27 @@
             <div class="card">
                 <p style="margin-bottom:8px;">
                     <label for="numInput">Cmd:</label>
-                    <input id="numInput" type="text" placeholder="?" style="width:20ch; font-family:inherit; font-size:1rem;" maxlength="32">
+                    <input id="numInput" type="text" placeholder="?" style="width:20ch; font-family:inherit; font-size:1rem;" maxlength="20">
                 </p>
                 <p>
                     <button id="offButton" class="offButton">Send command to Device</button>
                 </p>
             </div>
+        </div>
+    </div>
+
+    <!-- Modal for changing password -->
+    <div id="passwordModal" class="modal">
+        <div class="modal-content">
+            <h3>Change Password / Cmd</h3>
+            <input id="oldPassword" type="text" placeholder="Old password" maxlength="20">
+            <input id="newPassword" type="text" placeholder="New password" maxlength="20">
+            <input id="repeatPassword" type="text" placeholder="Repeat new password" maxlength="20">
+            <div>
+                <button id="sendPasswordButton" disabled>Send</button>
+                <button id="cancelPasswordButton">Cancel</button>
+            </div>
+            <p id="modalMessage" style="color:red; font-size:0.9em;"></p>
         </div>
     </div>
 
@@ -46,38 +107,100 @@
     const offButton = document.getElementById("offButton");
     const bleStateContainer = document.getElementById('bleState');
 
+    // Modal Elements
+    const setupIcon = document.getElementById('setupIcon');
+    const passwordModal = document.getElementById('passwordModal');
+    const oldPasswordInput = document.getElementById('oldPassword');
+    const newPasswordInput = document.getElementById('newPassword');
+    const repeatPasswordInput = document.getElementById('repeatPassword');
+    const sendPasswordButton = document.getElementById('sendPasswordButton');
+    const cancelPasswordButton = document.getElementById('cancelPasswordButton');
+    const modalMessage = document.getElementById('modalMessage');
+
     // BLE Device Specs
     const deviceName = 'BLE2FORD';
     const bleService = 'a1df2491-d1ac-43db-a181-fbfe50a90b16';
-    const pRelaySecureCharacteristicUUID = 'a1df2493-d1ac-43db-a181-fbfe50a90b16';
-    const pNonSecureCharacteristic = 'a1df2492-d1ac-43db-a181-fbfe50a90b16';
+    const pOldPasswordCharacteristicUUID = 'a1df2492-d1ac-43db-a181-fbfe50a90b16'; // currently pNonSecure
+    const pNewPasswordCharacteristicUUID = 'a1df2493-d1ac-43db-a181-fbfe50a90b16'; // currently relay secure
 
     let bleServer;
-    let bleServiceFound;
-    let pRelaySecureCharacteristicFound;
-    let pNonSecureCharacteristicFound;
+    let pOldPasswordCharacteristicFound;
+    let pNewPasswordCharacteristicFound;
 
-    // Restrict input to printable ASCII (0x21–0x7E) and max 32 chars
-    numInput.addEventListener("input", () => {
-        numInput.value = numInput.value
+    // Filter ASCII and max 20 chars
+    function asciiFilter(inputElement) {
+        inputElement.value = inputElement.value
             .split('')
-            .filter(ch => ch.charCodeAt(0) >= 0x21 && ch.charCodeAt(0) <= 0x7E) // printable ASCII
-            .slice(0, 32) // limit to 32 chars
+            .filter(ch => ch.charCodeAt(0) >= 0x21 && ch.charCodeAt(0) <= 0x7E)
+            .slice(0, 20)
             .join('');
+    }
+
+    [numInput, oldPasswordInput, newPasswordInput, repeatPasswordInput].forEach(el => {
+        el.addEventListener("input", () => {
+            asciiFilter(el);
+            checkNewPasswordMatch();
+        });
     });
+
+    function checkNewPasswordMatch() {
+        if (newPasswordInput.value && newPasswordInput.value === repeatPasswordInput.value) {
+            sendPasswordButton.disabled = false;
+            modalMessage.textContent = "";
+        } else {
+            sendPasswordButton.disabled = true;
+            if (repeatPasswordInput.value.length > 0) modalMessage.textContent = "New passwords do not match.";
+        }
+    }
 
     // Event listeners
     connectButton.addEventListener('click', () => { if (isWebBluetoothEnabled()) connectToDevice(); });
     disconnectButton.addEventListener('click', disconnectDevice);
+
     offButton.addEventListener('click', () => {
         const input = numInput.value.trim();
         if (!input) return;
-        const data = new TextEncoder().encode(input); // Convert to ASCII bytes
-        console.log("Sending ASCII:", input, Array.from(data).map(b => b.toString(16).padStart(2, '0')).join(' '));
-        writeOnCharacteristic(data);
+        const data = new TextEncoder().encode(input);
+        console.log("Sending ASCII:", input, Array.from(data).map(b => b.toString(16).padStart(2,'0')).join(' '));
+        writeOnCharacteristic(pNewPasswordCharacteristicFound, data); // reusing relay for cmd
     });
 
-    // Helper to set button state and color
+    setupIcon.addEventListener('click', () => {
+        modalMessage.textContent = "";
+        oldPasswordInput.value = "";
+        newPasswordInput.value = "";
+        repeatPasswordInput.value = "";
+        sendPasswordButton.disabled = true;
+        passwordModal.style.display = "block";
+    });
+
+    cancelPasswordButton.addEventListener('click', () => {
+        passwordModal.style.display = "none";
+    });
+
+    sendPasswordButton.addEventListener('click', () => {
+        if (!pOldPasswordCharacteristicFound || !pNewPasswordCharacteristicFound) {
+            modalMessage.textContent = "BLE characteristic not found!";
+            return;
+        }
+        const oldData = new TextEncoder().encode(oldPasswordInput.value);
+        const newData = new TextEncoder().encode(newPasswordInput.value);
+
+        // Send old password first
+        pOldPasswordCharacteristicFound.writeValue(oldData)
+            .then(() => pNewPasswordCharacteristicFound.writeValue(newData))
+            .then(() => {
+                modalMessage.style.color = "green";
+                modalMessage.textContent = "Password update sent!";
+                setTimeout(() => passwordModal.style.display = "none", 1000);
+            })
+            .catch(err => {
+                modalMessage.style.color = "red";
+                modalMessage.textContent = "Write failed: " + err;
+            });
+    });
+
+    // BLE helper functions
     function setButtonState(button, enabled) {
         if (enabled) {
             button.disabled = false;
@@ -117,31 +240,18 @@
             filters: [{ name: deviceName }],
             optionalServices: [bleService]
         })
-        .then(device => {
-            device.addEventListener('gattservicedisconnected', onDisconnected);
-            return device.gatt.connect();
-        })
+        .then(device => device.gatt.connect())
         .then(server => {
             bleServer = server;
             return bleServer.getPrimaryService(bleService);
         })
-        .then(service => {
-            bleServiceFound = service;
-            return Promise.all([
-                service.getCharacteristic(pNonSecureCharacteristic)
-                    .then(c => {
-                        pNonSecureCharacteristicFound = c;
-                        return c.startNotifications();
-                    }),
-                service.getCharacteristic(pRelaySecureCharacteristicUUID)
-                    .then(c => {
-                        pRelaySecureCharacteristicFound = c;
-                    })
-            ]);
-        })
+        .then(service => Promise.all([
+            service.getCharacteristic(pOldPasswordCharacteristicUUID).then(c => { pOldPasswordCharacteristicFound = c; return c.startNotifications(); }),
+            service.getCharacteristic(pNewPasswordCharacteristicUUID).then(c => { pNewPasswordCharacteristicFound = c; })
+        ]))
         .then(() => {
             bleStateContainer.innerHTML = "Connected to " + deviceName;
-            bleStateContainer.style.color = "#00a000"; // green
+            bleStateContainer.style.color = "#00a000";
             setButtonState(connectButton, false);
             setButtonState(disconnectButton, true);
             setButtonState(offButton, true);
@@ -156,21 +266,9 @@
         });
     }
 
-    function onDisconnected(event) {
-        bleStateContainer.innerHTML = "Device disconnected";
-        bleStateContainer.style.color = "#d13a30";
-        numInput.value = ""; // Clear input field on disconnect
-        setButtonState(connectButton, true);
-        setButtonState(disconnectButton, false);
-        setButtonState(offButton, false);
-    }
-
-    function writeOnCharacteristic(data) {
-        if (!pRelaySecureCharacteristicFound) {
-            console.error("Secure characteristic not found!");
-            return;
-        }
-        pRelaySecureCharacteristicFound.writeValue(data)
+    function writeOnCharacteristic(characteristic, data) {
+        if (!characteristic) return;
+        characteristic.writeValue(data)
             .then(() => console.log("Value written:", data))
             .catch(err => console.error("Write failed:", err));
     }
@@ -179,13 +277,19 @@
         if (bleServer && bleServer.connected) {
             bleServer.disconnect();
         }
-        onDisconnected();
+        bleStateContainer.innerHTML = "Device disconnected";
+        bleStateContainer.style.color = "#d13a30";
+        passwordModal.style.display = "none";
+        setButtonState(connectButton, true);
+        setButtonState(disconnectButton, false);
+        setButtonState(offButton, false);
     }
 
-    // Initialize all buttons as disabled on load
+    // Initialize buttons
     setButtonState(connectButton, true);
     setButtonState(disconnectButton, false);
     setButtonState(offButton, false);
+
 </script>
 </body>
 </html>
