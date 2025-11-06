@@ -11,7 +11,7 @@
     <p id="status"></p>
     <div class="topnav">
         <h1>BLE Web Application</h1>
-        <p style="font-size:0.8em; color:#666;">Version 1.3.G</p>
+        <p style="font-size:0.8em; color:#666;">Version 1.3.H</p>
     </div>
 
     <div class="content">
@@ -29,7 +29,7 @@
             <div class="card">
                 <p style="margin-bottom:8px;">
                     <label for="numInput">Cmd:</label>
-                    <input id="numInput" type="text" placeholder="?" style="width:20ch; font-family:inherit; font-size:1rem;">
+                    <input id="numInput" type="text" placeholder="?" style="width:20ch; font-family:inherit; font-size:1rem;" maxlength="32">
                 </p>
                 <p>
                     <button id="offButton" class="offButton">Send command to Device</button>
@@ -57,11 +57,12 @@
     let pRelaySecureCharacteristicFound;
     let pNonSecureCharacteristicFound;
 
-    // Restrict input to printable ASCII (0x21–0x7E)
+    // Restrict input to printable ASCII (0x21–0x7E) and max 32 chars
     numInput.addEventListener("input", () => {
         numInput.value = numInput.value
             .split('')
-            .filter(ch => ch.charCodeAt(0) >= 0x21 && ch.charCodeAt(0) <= 0x7E)
+            .filter(ch => ch.charCodeAt(0) >= 0x21 && ch.charCodeAt(0) <= 0x7E) // printable ASCII
+            .slice(0, 32) // limit to 32 chars
             .join('');
     });
 
