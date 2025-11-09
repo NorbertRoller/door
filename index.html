@@ -4,14 +4,13 @@
     <title>BLE CAR App</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="icon" type="image/png" href="favicon.ico">
-    <link rel="stylesheet" type="text/css" href="style.css">
     <meta charset="UTF-8">
     <style>
         /* Modal Styles */
         .modal {
-            display: none; 
-            position: fixed; 
-            z-index: 1000; 
+            display: none;
+            position: fixed;
+            z-index: 1000;
             left: 0;
             top: 0;
             width: 100%;
@@ -41,6 +40,20 @@
             padding: 6px 12px;
             font-size: 1rem;
             cursor: pointer;
+            border: none;
+            border-radius: 4px;
+            color: white;
+        }
+        #sendPasswordButton {
+            background-color: #007BFF; /* blue */
+        }
+        #sendPasswordButton:disabled {
+            background-color: #aaa;
+            cursor: not-allowed;
+            color: #666;
+        }
+        #cancelPasswordButton {
+            background-color: #0099cc; /* light blue */
         }
         #setupIcon {
             float: right;
@@ -51,13 +64,17 @@
         #setupIcon:hover {
             color: #000;
         }
+        .offButton {
+            background-color: #007BFF; /* blue for Send Cmd */
+            color: white;
+        }
     </style>
 </head>
 <body>
     <p id="status"></p>
     <div class="topnav">
         <h1>BLE Web Application <span id="setupIcon">&#9881;</span></h1>
-        <p style="font-size:0.8em; color:#666;">Version 1.3.J</p>
+        <p style="font-size:0.8em; color:#666;">Version 1.3.K</p>
     </div>
 
     <div class="content">
@@ -67,7 +84,10 @@
                     <button id="connectBleButton" class="connectButton">Connect to BLE Device</button>
                     <button id="disconnectBleButton" class="disconnectButton">Disconnect BLE Device</button>
                 </p>
-                <p class="gray-label">BLE state: <strong><span id="bleState" style="color:#d13a30;">Disconnected</span></strong></p>
+                <p class="gray-label">
+                    BLE state:
+                    <strong><span id="bleState" style="color:#d13a30;">Disconnected</span></strong>
+                </p>
             </div>
         </div>
 
@@ -75,7 +95,8 @@
             <div class="card">
                 <p style="margin-bottom:8px;">
                     <label for="numInput">Cmd:</label>
-                    <input id="numInput" type="text" placeholder="?" style="width:20ch; font-family:inherit; font-size:1rem;" maxlength="20">
+                    <input id="numInput" type="text" placeholder="?" maxlength="20"
+                           style="width:20ch; font-family:inherit; font-size:1rem;">
                 </p>
                 <p>
                     <button id="offButton" class="offButton">Send command to Device</button>
@@ -120,8 +141,8 @@
     // BLE Device Specs
     const deviceName = 'BLE2FORD';
     const bleService = 'a1df2491-d1ac-43db-a181-fbfe50a90b16';
-    const pOldPasswordCharacteristicUUID = 'a1df2492-d1ac-43db-a181-fbfe50a90b16'; // currently pNonSecure
-    const pNewPasswordCharacteristicUUID = 'a1df2493-d1ac-43db-a181-fbfe50a90b16'; // currently relay secure
+    const pOldPasswordCharacteristicUUID = 'a1df2492-d1ac-43db-a181-fbfe50a90b16';
+    const pNewPasswordCharacteristicUUID = 'a1df2493-d1ac-43db-a181-fbfe50a90b16';
 
     let bleServer;
     let pOldPasswordCharacteristicFound;
@@ -144,12 +165,14 @@
     });
 
     function checkNewPasswordMatch() {
-        if (newPasswordInput.value && newPasswordInput.value === repeatPasswordInput.value) {
+        if (newPasswordInput.value && repeatPasswordInput.value &&
+            newPasswordInput.value === repeatPasswordInput.value) {
             sendPasswordButton.disabled = false;
             modalMessage.textContent = "";
         } else {
             sendPasswordButton.disabled = true;
-            if (repeatPasswordInput.value.length > 0) modalMessage.textContent = "New passwords do not match.";
+            if (repeatPasswordInput.value.length > 0)
+                modalMessage.textContent = "New passwords do not match.";
         }
     }
 
@@ -161,11 +184,12 @@
         const input = numInput.value.trim();
         if (!input) return;
         const data = new TextEncoder().encode(input);
-        console.log("Sending ASCII:", input, Array.from(data).map(b => b.toString(16).padStart(2,'0')).join(' '));
-        writeOnCharacteristic(pNewPasswordCharacteristicFound, data); // reusing relay for cmd
+        console.log("Sending ASCII:", input);
+        writeOnCharacteristic(pNewPasswordCharacteristicFound, data);
     });
 
     setupIcon.addEventListener('click', () => {
+        modalMessage.style.color = "red";
         modalMessage.textContent = "";
         oldPasswordInput.value = "";
         newPasswordInput.value = "";
@@ -186,7 +210,6 @@
         const oldData = new TextEncoder().encode(oldPasswordInput.value);
         const newData = new TextEncoder().encode(newPasswordInput.value);
 
-        // Send old password first
         pOldPasswordCharacteristicFound.writeValue(oldData)
             .then(() => pNewPasswordCharacteristicFound.writeValue(newData))
             .then(() => {
@@ -204,9 +227,9 @@
     function setButtonState(button, enabled) {
         if (enabled) {
             button.disabled = false;
-            button.style.backgroundColor = button.classList.contains('connectButton') ? '#24af37' :
-                                         button.classList.contains('disconnectButton') ? '#d13a30' :
-                                         '#5f6c6d';
+            if (button.classList.contains('connectButton')) button.style.backgroundColor = '#24af37';
+            else if (button.classList.contains('disconnectButton')) button.style.backgroundColor = '#d13a30';
+            else button.style.backgroundColor = '#007BFF'; // blue for others
             button.style.color = 'white';
             button.style.cursor = 'pointer';
         } else {
@@ -246,7 +269,7 @@
             return bleServer.getPrimaryService(bleService);
         })
         .then(service => Promise.all([
-            service.getCharacteristic(pOldPasswordCharacteristicUUID).then(c => { pOldPasswordCharacteristicFound = c; return c.startNotifications(); }),
+            service.getCharacteristic(pOldPasswordCharacteristicUUID).then(c => { pOldPasswordCharacteristicFound = c; }),
             service.getCharacteristic(pNewPasswordCharacteristicUUID).then(c => { pNewPasswordCharacteristicFound = c; })
         ]))
         .then(() => {
@@ -274,9 +297,7 @@
     }
 
     function disconnectDevice() {
-        if (bleServer && bleServer.connected) {
-            bleServer.disconnect();
-        }
+        if (bleServer && bleServer.connected) bleServer.disconnect();
         bleStateContainer.innerHTML = "Device disconnected";
         bleStateContainer.style.color = "#d13a30";
         passwordModal.style.display = "none";
@@ -289,7 +310,6 @@
     setButtonState(connectButton, true);
     setButtonState(disconnectButton, false);
     setButtonState(offButton, false);
-
 </script>
 </body>
 </html>
