@@ -98,3 +98,75 @@ label {
 .reading {
     font-size: 1.8rem;
 }
+/* Cancel button: red like Disconnect */
+#cancelPasswordButton {
+    background-color: #d13a30;
+    color: white;
+    cursor: pointer;
+}
+
+#cancelPasswordButton:hover {
+    background-color: #a82920; /* slightly darker red on hover */
+}
+
+/* Send button: blue like index page buttons */
+#sendPasswordButton {
+    background-color: #007bff;
+    color: white;
+    cursor: pointer;
+}
+
+#sendPasswordButton:disabled {
+    background-color: #aaa;
+    color: #666;
+    cursor: not-allowed;
+}
+
+#sendPasswordButton:hover:enabled {
+    background-color: #0056b3; /* slightly darker blue on hover */
+}
+
+        /* Modal Styles */
+        .modal {
+            display: none; 
+            position: fixed; 
+            z-index: 1000; 
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.5);
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: 10% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 90%;
+            max-width: 400px;
+            border-radius: 8px;
+        }
+        .modal input {
+            width: 100%;
+            padding: 6px;
+            margin: 6px 0;
+            box-sizing: border-box;
+            font-family: inherit;
+            font-size: 1rem;
+        }
+        .modal button {
+            margin: 6px 4px 0 0;
+            padding: 6px 12px;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+        #setupIcon {
+            float: right;
+            cursor: pointer;
+            font-size: 1.5em;
+            color: #555;
+        }
+        #setupIcon:hover {
+            color: #000;
+        }

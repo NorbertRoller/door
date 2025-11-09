@@ -7,58 +7,13 @@
     <link rel="icon" type="image/png" href="favicon.ico">
     <link rel="stylesheet" type="text/css" href="style.css">
     <meta charset="UTF-8">
-    <style>
-        /* Modal Styles */
-        .modal {
-            display: none; 
-            position: fixed; 
-            z-index: 1000; 
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            overflow: auto;
-            background-color: rgba(0,0,0,0.5);
-        }
-        .modal-content {
-            background-color: #fefefe;
-            margin: 10% auto;
-            padding: 20px;
-            border: 1px solid #888;
-            width: 90%;
-            max-width: 400px;
-            border-radius: 8px;
-        }
-        .modal input {
-            width: 100%;
-            padding: 6px;
-            margin: 6px 0;
-            box-sizing: border-box;
-            font-family: inherit;
-            font-size: 1rem;
-        }
-        .modal button {
-            margin: 6px 4px 0 0;
-            padding: 6px 12px;
-            font-size: 1rem;
-            cursor: pointer;
-        }
-        #setupIcon {
-            float: right;
-            cursor: pointer;
-            font-size: 1.5em;
-            color: #555;
-        }
-        #setupIcon:hover {
-            color: #000;
-        }
-    </style>
+
 </head>
 <body>
     <p id="status"></p>
     <div class="topnav">
         <h1>BLE Web Application <span id="setupIcon">&#9881;</span></h1>
-        <p style="font-size:0.8em; color:#666;">Version 1.3.J</p>
+        <p style="font-size:0.8em; color:#666;">Version 1.3.I</p>
     </div>
 
     <div class="content">
@@ -144,15 +99,25 @@
         });
     });
 
-    function checkNewPasswordMatch() {
-        if (newPasswordInput.value && newPasswordInput.value === repeatPasswordInput.value) {
-            sendPasswordButton.disabled = false;
-            modalMessage.textContent = "";
+function checkNewPasswordMatch() {
+    const newVal = newPasswordInput.value;
+    const repVal = repeatPasswordInput.value;
+
+    // Enable Send only when new and repeat are non-empty and equal
+    if (newVal.length > 0 && newVal === repVal) {
+        sendPasswordButton.disabled = false;
+        modalMessage.textContent = "";
+    } else {
+        sendPasswordButton.disabled = true;
+        // Show message only if repeat has content and values differ
+        if (repVal.length > 0 && newVal !== repVal) {
+            modalMessage.style.color = "red";
+            modalMessage.textContent = "New passwords do not match.";
         } else {
-            sendPasswordButton.disabled = true;
-            if (repeatPasswordInput.value.length > 0) modalMessage.textContent = "New passwords do not match.";
+            modalMessage.textContent = "";
         }
     }
+}
 
     // Event listeners
     connectButton.addEventListener('click', () => { if (isWebBluetoothEnabled()) connectToDevice(); });
