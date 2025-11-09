@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html>
 <head>
@@ -7,7 +6,6 @@
     <link rel="icon" type="image/png" href="favicon.ico">
     <link rel="stylesheet" type="text/css" href="style.css">
     <meta charset="UTF-8">
-
 </head>
 <body>
     <p id="status"></p>
@@ -76,12 +74,14 @@
     // BLE Device Specs
     const deviceName = 'BLE2FORD';
     const bleService = 'a1df2491-d1ac-43db-a181-fbfe50a90b16';
-    const pOldPasswordCharacteristicUUID = 'a1df2492-d1ac-43db-a181-fbfe50a90b16'; // currently pNonSecure
-    const pNewPasswordCharacteristicUUID = 'a1df2493-d1ac-43db-a181-fbfe50a90b16'; // currently relay secure
+    const pOldPasswordCharacteristicUUID = 'a1df2492-d1ac-43db-a181-fbfe50a90b16';
+    const pNewPasswordCharacteristicUUID = 'a1df2493-d1ac-43db-a181-fbfe50a90b16';
+    const pRelaySecureCharacteristicUUID = 'a1df2494-d1ac-43db-a181-fbfe50a90b16';
 
     let bleServer;
     let pOldPasswordCharacteristicFound;
     let pNewPasswordCharacteristicFound;
+    let pRelaySecureCharacteristicFound;
 
     // Filter ASCII and max 20 chars
     function asciiFilter(inputElement) {
@@ -99,25 +99,22 @@
         });
     });
 
-function checkNewPasswordMatch() {
-    const newVal = newPasswordInput.value;
-    const repVal = repeatPasswordInput.value;
-
-    // Enable Send only when new and repeat are non-empty and equal
-    if (newVal.length > 0 && newVal === repVal) {
-        sendPasswordButton.disabled = false;
-        modalMessage.textContent = "";
-    } else {
-        sendPasswordButton.disabled = true;
-        // Show message only if repeat has content and values differ
-        if (repVal.length > 0 && newVal !== repVal) {
-            modalMessage.style.color = "red";
-            modalMessage.textContent = "New passwords do not match.";
-        } else {
+    function checkNewPasswordMatch() {
+        const newVal = newPasswordInput.value;
+        const repVal = repeatPasswordInput.value;
+        if (newVal.length > 0 && newVal === repVal) {
+            sendPasswordButton.disabled = false;
             modalMessage.textContent = "";
+        } else {
+            sendPasswordButton.disabled = true;
+            if (repVal.length > 0 && newVal !== repVal) {
+                modalMessage.style.color = "red";
+                modalMessage.textContent = "New passwords do not match.";
+            } else {
+                modalMessage.textContent = "";
+            }
         }
     }
-}
 
     // Event listeners
     connectButton.addEventListener('click', () => { if (isWebBluetoothEnabled()) connectToDevice(); });
@@ -127,8 +124,7 @@ function checkNewPasswordMatch() {
         const input = numInput.value.trim();
         if (!input) return;
         const data = new TextEncoder().encode(input);
-        console.log("Sending ASCII:", input, Array.from(data).map(b => b.toString(16).padStart(2,'0')).join(' '));
-        writeOnCharacteristic(pNewPasswordCharacteristicFound, data); // reusing relay for cmd
+        writeOnCharacteristic(pRelaySecureCharacteristicFound, data);
     });
 
     setupIcon.addEventListener('click', () => {
@@ -152,9 +148,9 @@ function checkNewPasswordMatch() {
         const oldData = new TextEncoder().encode(oldPasswordInput.value);
         const newData = new TextEncoder().encode(newPasswordInput.value);
 
-        // Send old password first
-        pOldPasswordCharacteristicFound.writeValue(oldData)
-            .then(() => pNewPasswordCharacteristicFound.writeValue(newData))
+        // Send old password first, then new password
+        writeOnCharacteristic(pOldPasswordCharacteristicFound, oldData)
+            .then(() => writeOnCharacteristic(pNewPasswordCharacteristicFound, newData))
             .then(() => {
                 modalMessage.style.color = "green";
                 modalMessage.textContent = "Password update sent!";
@@ -166,21 +162,22 @@ function checkNewPasswordMatch() {
             });
     });
 
-    // BLE helper functions
-    function setButtonState(button, enabled) {
-        if (enabled) {
-            button.disabled = false;
-            button.style.backgroundColor = button.classList.contains('connectButton') ? '#24af37' :
-                                         button.classList.contains('disconnectButton') ? '#d13a30' :
-                                         '#5f6c6d';
-            button.style.color = 'white';
-            button.style.cursor = 'pointer';
-        } else {
-            button.disabled = true;
-            button.style.backgroundColor = '#aaa';
-            button.style.color = '#666';
-            button.style.cursor = 'not-allowed';
-        }
+    // Enhanced write function
+    function writeOnCharacteristic(characteristicOrArray, data) {
+        if (!characteristicOrArray) return;
+
+        const characteristics = Array.isArray(characteristicOrArray)
+            ? characteristicOrArray
+            : [characteristicOrArray];
+
+        let promise = Promise.resolve();
+        characteristics.forEach(char => {
+            promise = promise.then(() => char.writeValue(data)
+                .then(() => console.log(`Value written to ${char.uuid}:`, data))
+                .catch(err => console.error(`Write failed on ${char.uuid}:`, err))
+            );
+        });
+        return promise;
     }
 
     function isWebBluetoothEnabled() {
@@ -195,53 +192,45 @@ function checkNewPasswordMatch() {
         return true;
     }
 
-function connectToDevice() {
-    setButtonState(connectButton, false);
-    setButtonState(disconnectButton, false);
-    setButtonState(offButton, false);
-    bleStateContainer.innerHTML = 'Connecting to ' + deviceName;
-    bleStateContainer.style.color = "#d13a30";
+    function connectToDevice() {
+        setButtonState(connectButton, false);
+        setButtonState(disconnectButton, false);
+        setButtonState(offButton, false);
+        bleStateContainer.innerHTML = 'Connecting to ' + deviceName;
+        bleStateContainer.style.color = "#d13a30";
 
-    navigator.bluetooth.requestDevice({
-        filters: [{ name: deviceName }],
-        optionalServices: [bleService]
-    })
-    .then(device => device.gatt.connect())
-    .then(server => {
-        bleServer = server;
-        return bleServer.getPrimaryService(bleService);
-    })
-    .then(service => {
-        // Get characteristics (write-only for password)
-        return Promise.all([
+        navigator.bluetooth.requestDevice({
+            filters: [{ name: deviceName }],
+            optionalServices: [bleService]
+        })
+        .then(device => device.gatt.connect())
+        .then(server => {
+            bleServer = server;
+            return bleServer.getPrimaryService(bleService);
+        })
+        .then(service => Promise.all([
             service.getCharacteristic(pOldPasswordCharacteristicUUID)
                 .then(c => { pOldPasswordCharacteristicFound = c; }),
             service.getCharacteristic(pNewPasswordCharacteristicUUID)
-                .then(c => { pNewPasswordCharacteristicFound = c; })
-        ]);
-    })
-    .then(() => {
-        bleStateContainer.innerHTML = "Connected to " + deviceName;
-        bleStateContainer.style.color = "#00a000"; // green
-        setButtonState(connectButton, false);
-        setButtonState(disconnectButton, true);
-        setButtonState(offButton, true);
-    })
-    .catch(err => {
-        console.error("Connection failed:", err);
-        bleStateContainer.innerHTML = "Connection failed";
-        bleStateContainer.style.color = "#d13a30";
-        setButtonState(connectButton, true);
-        setButtonState(disconnectButton, false);
-        setButtonState(offButton, false);
-    });
-}
-
-    function writeOnCharacteristic(characteristic, data) {
-        if (!characteristic) return;
-        characteristic.writeValue(data)
-            .then(() => console.log("Value written:", data))
-            .catch(err => console.error("Write failed:", err));
+                .then(c => { pNewPasswordCharacteristicFound = c; }),
+            service.getCharacteristic(pRelaySecureCharacteristicUUID)
+                .then(c => { pRelaySecureCharacteristicFound = c; })
+        ]))
+        .then(() => {
+            bleStateContainer.innerHTML = "Connected to " + deviceName;
+            bleStateContainer.style.color = "#00a000";
+            setButtonState(connectButton, false);
+            setButtonState(disconnectButton, true);
+            setButtonState(offButton, true);
+        })
+        .catch(err => {
+            console.error("Connection failed:", err);
+            bleStateContainer.innerHTML = "Connection failed";
+            bleStateContainer.style.color = "#d13a30";
+            setButtonState(connectButton, true);
+            setButtonState(disconnectButton, false);
+            setButtonState(offButton, false);
+        });
     }
 
     function disconnectDevice() {
@@ -254,6 +243,22 @@ function connectToDevice() {
         setButtonState(connectButton, true);
         setButtonState(disconnectButton, false);
         setButtonState(offButton, false);
+    }
+
+    function setButtonState(button, enabled) {
+        if (enabled) {
+            button.disabled = false;
+            if(button.classList.contains('connectButton')) button.style.backgroundColor = '#24af37';
+            else if(button.classList.contains('disconnectButton')) button.style.backgroundColor = '#d13a30';
+            else button.style.backgroundColor = '#5f6c6d';
+            button.style.color = 'white';
+            button.style.cursor = 'pointer';
+        } else {
+            button.disabled = true;
+            button.style.backgroundColor = '#aaa';
+            button.style.color = '#666';
+            button.style.cursor = 'not-allowed';
+        }
     }
 
     // Initialize buttons
