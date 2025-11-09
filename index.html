@@ -195,42 +195,47 @@ function checkNewPasswordMatch() {
         return true;
     }
 
-    function connectToDevice() {
+function connectToDevice() {
+    setButtonState(connectButton, false);
+    setButtonState(disconnectButton, false);
+    setButtonState(offButton, false);
+    bleStateContainer.innerHTML = 'Connecting to ' + deviceName;
+    bleStateContainer.style.color = "#d13a30";
+
+    navigator.bluetooth.requestDevice({
+        filters: [{ name: deviceName }],
+        optionalServices: [bleService]
+    })
+    .then(device => device.gatt.connect())
+    .then(server => {
+        bleServer = server;
+        return bleServer.getPrimaryService(bleService);
+    })
+    .then(service => {
+        // Get characteristics (write-only for password)
+        return Promise.all([
+            service.getCharacteristic(pOldPasswordCharacteristicUUID)
+                .then(c => { pOldPasswordCharacteristicFound = c; }),
+            service.getCharacteristic(pNewPasswordCharacteristicUUID)
+                .then(c => { pNewPasswordCharacteristicFound = c; })
+        ]);
+    })
+    .then(() => {
+        bleStateContainer.innerHTML = "Connected to " + deviceName;
+        bleStateContainer.style.color = "#00a000"; // green
         setButtonState(connectButton, false);
+        setButtonState(disconnectButton, true);
+        setButtonState(offButton, true);
+    })
+    .catch(err => {
+        console.error("Connection failed:", err);
+        bleStateContainer.innerHTML = "Connection failed";
+        bleStateContainer.style.color = "#d13a30";
+        setButtonState(connectButton, true);
         setButtonState(disconnectButton, false);
         setButtonState(offButton, false);
-        bleStateContainer.innerHTML = 'Connecting to ' + deviceName;
-        bleStateContainer.style.color = "#d13a30";
-
-        navigator.bluetooth.requestDevice({
-            filters: [{ name: deviceName }],
-            optionalServices: [bleService]
-        })
-        .then(device => device.gatt.connect())
-        .then(server => {
-            bleServer = server;
-            return bleServer.getPrimaryService(bleService);
-        })
-        .then(service => Promise.all([
-            service.getCharacteristic(pOldPasswordCharacteristicUUID).then(c => { pOldPasswordCharacteristicFound = c; return c.startNotifications(); }),
-            service.getCharacteristic(pNewPasswordCharacteristicUUID).then(c => { pNewPasswordCharacteristicFound = c; })
-        ]))
-        .then(() => {
-            bleStateContainer.innerHTML = "Connected to " + deviceName;
-            bleStateContainer.style.color = "#00a000";
-            setButtonState(connectButton, false);
-            setButtonState(disconnectButton, true);
-            setButtonState(offButton, true);
-        })
-        .catch(err => {
-            console.error("Connection failed:", err);
-            bleStateContainer.innerHTML = "Connection failed";
-            bleStateContainer.style.color = "#d13a30";
-            setButtonState(connectButton, true);
-            setButtonState(disconnectButton, false);
-            setButtonState(offButton, false);
-        });
-    }
+    });
+}
 
     function writeOnCharacteristic(characteristic, data) {
         if (!characteristic) return;
