@@ -11,7 +11,7 @@
     <p id="status"></p>
     <div class="topnav">
         <h1>BLE Web Application <span id="setupIcon">&#9881;</span></h1>
-        <p style="font-size:0.8em; color:#666;">Version 1.4.O</p>
+        <p style="font-size:0.8em; color:#666;">Version 1.4.P</p>
     </div>
 
     <div class="content">
@@ -140,21 +140,18 @@
         passwordModal.style.display = "none";
     });
 
-    // Poll with retries to read old password status
-    async function pollOldPasswordStatus(maxRetries = 5, delayMs = 500) {
+    // Helper: read old password status from ESP32
+    async function readOldPasswordStatus() {
         if (!pOldPasswordCharacteristicFound) return null;
-        for (let i = 0; i < maxRetries; i++) {
-            try {
-                const value = await pOldPasswordCharacteristicFound.readValue();
-                const status = new TextDecoder().decode(value).trim();
-                console.log(`Old password status attempt ${i + 1}:`, status);
-                if (status === "0" || status === "1") return status;
-            } catch (err) {
-                console.error("Failed to read old password status:", err);
-            }
-            await new Promise(r => setTimeout(r, delayMs));
+        try {
+            const value = await pOldPasswordCharacteristicFound.readValue();
+            const status = new TextDecoder().decode(value).trim();
+            console.log("Old password status:", status);
+            return status; // "1" = success, "0" = failure
+        } catch (err) {
+            console.error("Failed to read old password status:", err);
+            return null;
         }
-        return null; // max retries exhausted
     }
 
     // Send password with feedback
@@ -169,22 +166,31 @@
         const newData = new TextEncoder().encode(newPasswordInput.value);
 
         try {
+            // Send old password first
             await pOldPasswordCharacteristicFound.writeValue(oldData);
+            // Send new password
             await pNewPasswordCharacteristicFound.writeValue(newData);
 
-            // Poll status with retries
-            const status = await pollOldPasswordStatus(5, 500);
-            if (status === "1") {
-                modalMessage.style.color = "green";
-                modalMessage.textContent = "Password update successful!";
-                setTimeout(() => passwordModal.style.display = "none", 1000);
-            } else if (status === "0") {
-                modalMessage.style.color = "red";
-                modalMessage.textContent = "Old password incorrect!";
-            } else {
-                modalMessage.style.color = "red";
-                modalMessage.textContent = "No response from device!";
-            }
+            // Read status once after short delay
+            setTimeout(async () => {
+                try {
+                    const status = await readOldPasswordStatus();
+                    if (status === "1") {
+                        modalMessage.style.color = "green";
+                        modalMessage.textContent = "Password update successful!";
+                        setTimeout(() => passwordModal.style.display = "none", 1000);
+                    } else if (status === "0") {
+                        modalMessage.style.color = "red";
+                        modalMessage.textContent = "Old password incorrect!";
+                    } else {
+                        modalMessage.style.color = "red";
+                        modalMessage.textContent = "No response from device!";
+                    }
+                } catch (err) {
+                    modalMessage.style.color = "red";
+                    modalMessage.textContent = "Read failed: " + err;
+                }
+            }, 200); // 200ms delay
         } catch (err) {
             modalMessage.style.color = "red";
             modalMessage.textContent = "Write failed: " + err;
@@ -294,7 +300,6 @@
     setButtonState(connectButton, true);
     setButtonState(disconnectButton, false);
     setButtonState(offButton, false);
-
 </script>
 </body>
 </html>
