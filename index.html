@@ -11,7 +11,7 @@
     <p id="status"></p>
     <div class="topnav">
         <h1>BLE Web Application <span id="setupIcon">&#9881;</span></h1>
-        <p style="font-size:0.8em; color:#666;">Version 1.4.Qa</p>
+        <p style="font-size:0.8em; color:#666;">Version 1.4.P</p>
     </div>
 
     <div class="content">
@@ -140,13 +140,18 @@
         passwordModal.style.display = "none";
     });
 
-    // Helper: read old password status from ESP32 (only status, not password)
-    async function readOldPasswordStatus() {
+    // Helper: read old password status reliably (discard first stale read)
+    async function readOldPasswordStatusReliable() {
         if (!pOldPasswordCharacteristicFound) return null;
         try {
+            // First read (stale)
+            await pOldPasswordCharacteristicFound.readValue();
+            // Small delay for ESP32 to update
+            await new Promise(resolve => setTimeout(resolve, 50));
+            // Second read (actual status)
             const value = await pOldPasswordCharacteristicFound.readValue();
             const status = new TextDecoder().decode(value);
-            console.log("Old password status:", status);
+            console.log("Old password status (reliable):", status);
             return status; // "1" = success, "0" = failure
         } catch (err) {
             console.error("Failed to read old password status:", err);
@@ -166,13 +171,12 @@
         const newData = new TextEncoder().encode(newPasswordInput.value);
 
         try {
-            // Write old and new password
             await pOldPasswordCharacteristicFound.writeValue(oldData);
             await pNewPasswordCharacteristicFound.writeValue(newData);
 
-            // Poll status after small delay
+            // Poll status after short delay
             setTimeout(async () => {
-                const status = await readOldPasswordStatus();
+                const status = await readOldPasswordStatusReliable();
                 if (status === "1") {
                     modalMessage.style.color = "green";
                     modalMessage.textContent = "Password update successful!";
@@ -184,7 +188,7 @@
                     modalMessage.style.color = "red";
                     modalMessage.textContent = "No response from device!";
                 }
-            }, 500);
+            }, 100);
         } catch (err) {
             modalMessage.style.color = "red";
             modalMessage.textContent = "Write failed: " + err;
@@ -294,7 +298,6 @@
     setButtonState(connectButton, true);
     setButtonState(disconnectButton, false);
     setButtonState(offButton, false);
-
 </script>
 </body>
 </html>
