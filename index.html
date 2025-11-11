@@ -11,7 +11,7 @@
     <p id="status"></p>
     <div class="topnav">
         <h1>BLE Web Application <span id="setupIcon">&#9881;</span></h1>
-        <p style="font-size:0.8em; color:#666;">Version 1.4.Q</p>
+        <p style="font-size:0.8em; color:#666;">Version 1.4.O</p>
     </div>
 
     <div class="content">
@@ -140,18 +140,16 @@
         passwordModal.style.display = "none";
     });
 
-    // Reliable read of old password status (ignore first value if it is actual password)
-    async function readOldPasswordStatusReliable() {
+    // Helper: read old password status from ESP32 (trim extra chars)
+    async function readOldPasswordStatus() {
         if (!pOldPasswordCharacteristicFound) return null;
         try {
-            for (let i = 0; i < 5; i++) { // up to 5 retries
-                const value = await pOldPasswordCharacteristicFound.readValue();
-                const status = new TextDecoder().decode(value);
-                console.log("Old password read attempt:", i, status);
-                if (status === "1" || status === "0") return status;
-                await new Promise(resolve => setTimeout(resolve, 50));
-            }
-            return null;
+            const value = await pOldPasswordCharacteristicFound.readValue();
+            const statusRaw = new TextDecoder().decode(value);
+            const status = statusRaw.trim(); // remove padding/old password
+            console.log("Old password status:", status);
+            if (status === "1" || status === "0") return status;
+            return null; // discard unexpected values
         } catch (err) {
             console.error("Failed to read old password status:", err);
             return null;
@@ -170,25 +168,28 @@
         const newData = new TextEncoder().encode(newPasswordInput.value);
 
         try {
-            // Write old password first (ESP32 expects it)
             await pOldPasswordCharacteristicFound.writeValue(oldData);
             await pNewPasswordCharacteristicFound.writeValue(newData);
 
-            // Wait a bit, then reliably read status
+            // Poll twice to skip the first read (which returns old password)
             setTimeout(async () => {
-                const status = await readOldPasswordStatusReliable();
-                if (status === "1") {
-                    modalMessage.style.color = "green";
-                    modalMessage.textContent = "Password update successful!";
-                    setTimeout(() => passwordModal.style.display = "none", 1000);
-                } else if (status === "0") {
-                    modalMessage.style.color = "red";
-                    modalMessage.textContent = "Old password incorrect!";
-                } else {
-                    modalMessage.style.color = "red";
-                    modalMessage.textContent = "No response from device!";
-                }
-            }, 100);
+                await readOldPasswordStatus(); // discard first
+                setTimeout(async () => {
+                    const status = await readOldPasswordStatus(); // real status
+                    if (status === "1") {
+                        modalMessage.style.color = "green";
+                        modalMessage.textContent = "Password update successful!";
+                        setTimeout(() => passwordModal.style.display = "none", 1000);
+                    } else if (status === "0") {
+                        modalMessage.style.color = "red";
+                        modalMessage.textContent = "Old password incorrect!";
+                    } else {
+                        modalMessage.style.color = "red";
+                        modalMessage.textContent = "No response from device!";
+                    }
+                }, 200); // short delay for second read
+            }, 200); // initial read delay
+
         } catch (err) {
             modalMessage.style.color = "red";
             modalMessage.textContent = "Write failed: " + err;
@@ -298,6 +299,7 @@
     setButtonState(connectButton, true);
     setButtonState(disconnectButton, false);
     setButtonState(offButton, false);
+
 </script>
 </body>
 </html>
