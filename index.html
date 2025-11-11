@@ -11,7 +11,7 @@
     <p id="status"></p>
     <div class="topnav">
         <h1>BLE Web Application <span id="setupIcon">&#9881;</span></h1>
-        <p style="font-size:0.8em; color:#666;">Version 1.4.T</p>
+        <p style="font-size:0.8em; color:#666;">Version 1.4.U</p>
     </div>
 
     <div class="content">
@@ -49,7 +49,8 @@
                 <button id="sendPasswordButton" disabled>Send</button>
                 <button id="cancelPasswordButton">Cancel</button>
             </div>
-            <p id="modalMessage" style="color:red; font-size:0.9em; white-space: pre-line;"></p>
+            <p id="modalMessage" style="color:red; font-size:0.9em;"></p>
+            <p id="modalDebug" style="color:blue; font-size:0.8em;"></p>
         </div>
     </div>
 
@@ -70,6 +71,7 @@
     const sendPasswordButton = document.getElementById('sendPasswordButton');
     const cancelPasswordButton = document.getElementById('cancelPasswordButton');
     const modalMessage = document.getElementById('modalMessage');
+    const modalDebug = document.getElementById('modalDebug');
 
     // BLE Device Specs
     const deviceName = 'BLE2FORD';
@@ -129,6 +131,7 @@
 
     setupIcon.addEventListener('click', () => {
         modalMessage.textContent = "";
+        modalDebug.textContent = "";
         oldPasswordInput.value = "";
         newPasswordInput.value = "";
         repeatPasswordInput.value = "";
@@ -145,13 +148,14 @@
         if (!pOldPasswordCharacteristicFound) return null;
         try {
             const value = await pOldPasswordCharacteristicFound.readValue();
-            const decoded = new TextDecoder().decode(value);
-            const bytes = new Uint8Array(value.buffer);
-            const hex = Array.from(bytes).map(b => b.toString(16).padStart(2,'0')).join(' ');
-            modalMessage.textContent += `Read: decoded="${decoded}", hex=${hex}\n`;
-            return decoded; // "1" = success, "0" = failure
+            const hex = Array.from(new Uint8Array(value.buffer))
+                .map(b => b.toString(16).padStart(2,'0'))
+                .join(' ');
+            const decoded = new TextDecoder().decode(value).replace(/\0/g,'').trim();
+            modalDebug.innerHTML += `<br>Read: decoded="${decoded}", hex=${hex}`;
+            return decoded;
         } catch (err) {
-            modalMessage.textContent += `Read failed: ${err}\n`;
+            modalDebug.innerHTML += `<br>Read failed: ${err}`;
             return null;
         }
     }
@@ -166,35 +170,37 @@
 
         const oldData = new TextEncoder().encode(oldPasswordInput.value);
         const newData = new TextEncoder().encode(newPasswordInput.value);
-        modalMessage.textContent += `Old password sent: ${oldPasswordInput.value}\nNew password sent: ${newPasswordInput.value}\n`;
+
+        modalDebug.innerHTML += `<br>Old password sent: ${oldPasswordInput.value}`;
+        modalDebug.innerHTML += `<br>New password sent: ${newPasswordInput.value}`;
 
         try {
             await pOldPasswordCharacteristicFound.writeValue(oldData);
             await pNewPasswordCharacteristicFound.writeValue(newData);
 
-            // Poll twice to skip the first read (old password)
+            // Poll twice to skip first read (which returns old password)
             setTimeout(async () => {
-                modalMessage.textContent += `Skipping first read (old password)...\n`;
-                await readOldPasswordStatus(); // discard first
-                modalMessage.textContent += `Reading actual status...\n`;
+                modalDebug.innerHTML += `<br>Skipping first read (old password)...`;
+                await readOldPasswordStatus();
                 setTimeout(async () => {
-                    const status = await readOldPasswordStatus(); // real status
+                    modalDebug.innerHTML += `<br>Reading actual status...`;
+                    const status = await readOldPasswordStatus();
                     if (status === "1") {
                         modalMessage.style.color = "green";
-                        modalMessage.textContent += "Password update successful!\n";
+                        modalMessage.textContent = "Password update successful!";
                         setTimeout(() => passwordModal.style.display = "none", 1000);
                     } else if (status === "0") {
                         modalMessage.style.color = "red";
-                        modalMessage.textContent += "Old password incorrect!\n";
+                        modalMessage.textContent = "Old password incorrect!";
                     } else {
                         modalMessage.style.color = "red";
-                        modalMessage.textContent += "No response from device!\n";
+                        modalMessage.textContent = "No response from device!";
                     }
-                }, 200); // short delay for second read
-            }, 200); // initial read delay
+                }, 200);
+            }, 200);
         } catch (err) {
             modalMessage.style.color = "red";
-            modalMessage.textContent += "Write failed: " + err + "\n";
+            modalMessage.textContent = "Write failed: " + err;
         }
     });
 
@@ -297,6 +303,7 @@
     setButtonState(connectButton, true);
     setButtonState(disconnectButton, false);
     setButtonState(offButton, false);
+
 </script>
 </body>
 </html>
