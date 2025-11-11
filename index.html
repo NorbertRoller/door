@@ -11,7 +11,7 @@
     <p id="status"></p>
     <div class="topnav">
         <h1>BLE Web Application <span id="setupIcon">&#9881;</span></h1>
-        <p style="font-size:0.8em; color:#666;">Version 1.4.W</p>
+        <p style="font-size:0.8em; color:#666;">Version 1.4.X</p>
     </div>
 
     <div class="content">
@@ -50,7 +50,6 @@
                 <button id="cancelPasswordButton">Cancel</button>
             </div>
             <p id="modalMessage" style="color:red; font-size:0.9em;"></p>
-            <p id="modalDebug" style="color:blue; font-size:0.8em;"></p>
         </div>
     </div>
 
@@ -70,7 +69,6 @@
     const sendPasswordButton = document.getElementById('sendPasswordButton');
     const cancelPasswordButton = document.getElementById('cancelPasswordButton');
     const modalMessage = document.getElementById('modalMessage');
-    const modalDebug = document.getElementById('modalDebug');
 
     // BLE Device Specs
     const deviceName = 'BLE2FORD';
@@ -142,7 +140,6 @@
 
     setupIcon.addEventListener('click', () => {
         modalMessage.textContent = "";
-        modalDebug.textContent = "";
         oldPasswordInput.value = "";
         newPasswordInput.value = "";
         repeatPasswordInput.value = "";
@@ -153,8 +150,8 @@
 
     cancelPasswordButton.addEventListener('click', () => {
         passwordModal.style.display = "none";
-        numInput.value = ""; // clear cmd input after modal
-        offButton.style.backgroundColor = '#5f6c6d'; // reset to dark grey
+        numInput.value = "";
+        offButton.style.backgroundColor = '#5f6c6d'; 
         offButton.style.color = 'white';
         offButton.style.cursor = 'default';
         resetCancelButton();
@@ -171,14 +168,8 @@
         if (!pOldPasswordCharacteristicFound) return null;
         try {
             const value = await pOldPasswordCharacteristicFound.readValue();
-            const hex = Array.from(new Uint8Array(value.buffer))
-                .map(b => b.toString(16).padStart(2,'0'))
-                .join(' ');
-            const decoded = new TextDecoder().decode(value).replace(/\0/g,'').trim();
-            modalDebug.innerHTML += `<br>Read: decoded="${decoded}", hex=${hex}`;
-            return decoded;
+            return new TextDecoder().decode(value).replace(/\0/g,'').trim();
         } catch (err) {
-            modalDebug.innerHTML += `<br>Read failed: ${err}`;
             return null;
         }
     }
@@ -193,18 +184,13 @@
         const oldData = new TextEncoder().encode(oldPasswordInput.value);
         const newData = new TextEncoder().encode(newPasswordInput.value);
 
-        modalDebug.innerHTML += `<br>Old password sent: ${oldPasswordInput.value}`;
-        modalDebug.innerHTML += `<br>New password sent: ${newPasswordInput.value}`;
-
         try {
             await pOldPasswordCharacteristicFound.writeValue(oldData);
             await pNewPasswordCharacteristicFound.writeValue(newData);
 
             setTimeout(async () => {
-                modalDebug.innerHTML += `<br>Skipping first read (old password)...`;
-                await readOldPasswordStatus();
+                await readOldPasswordStatus(); // discard first read
                 setTimeout(async () => {
-                    modalDebug.innerHTML += `<br>Reading actual status...`;
                     const status = await readOldPasswordStatus();
 
                     if (status === "1") {
@@ -234,10 +220,7 @@
         const characteristics = Array.isArray(characteristicOrArray) ? characteristicOrArray : [characteristicOrArray];
         let promise = Promise.resolve();
         characteristics.forEach(char => {
-            promise = promise.then(() => char.writeValue(data)
-                .then(() => console.log(`Value written to ${char.uuid}:`, data))
-                .catch(err => console.error(`Write failed on ${char.uuid}:`, err))
-            );
+            promise = promise.then(() => char.writeValue(data));
         });
         return promise;
     }
