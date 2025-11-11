@@ -11,7 +11,7 @@
     <p id="status"></p>
     <div class="topnav">
         <h1>BLE Web Application <span id="setupIcon">&#9881;</span></h1>
-        <p style="font-size:0.8em; color:#666;">Version 1.4.Q</p>
+        <p style="font-size:0.8em; color:#666;">Version 1.4.R</p>
     </div>
 
     <div class="content">
@@ -50,6 +50,8 @@
                 <button id="cancelPasswordButton">Cancel</button>
             </div>
             <p id="modalMessage" style="color:red; font-size:0.9em;"></p>
+            <!-- Debug output -->
+            <pre id="debugOutput" style="font-size:0.8em; color:blue;"></pre>
         </div>
     </div>
 
@@ -70,6 +72,7 @@
     const sendPasswordButton = document.getElementById('sendPasswordButton');
     const cancelPasswordButton = document.getElementById('cancelPasswordButton');
     const modalMessage = document.getElementById('modalMessage');
+    const debugOutput = document.getElementById('debugOutput');
 
     // BLE Device Specs
     const deviceName = 'BLE2FORD';
@@ -129,6 +132,7 @@
 
     setupIcon.addEventListener('click', () => {
         modalMessage.textContent = "";
+        debugOutput.textContent = "";
         oldPasswordInput.value = "";
         newPasswordInput.value = "";
         repeatPasswordInput.value = "";
@@ -140,17 +144,17 @@
         passwordModal.style.display = "none";
     });
 
-    // Helper: read old password status from ESP32 with hex debug
+    // Helper: read old password status and show hex/debug
     async function readOldPasswordStatus() {
         if (!pOldPasswordCharacteristicFound) return null;
         try {
             const value = await pOldPasswordCharacteristicFound.readValue();
             const decoded = new TextDecoder().decode(value);
             const hex = Array.from(value).map(b => b.toString(16).padStart(2,'0')).join(' ');
-            console.log("Old password status (decoded):", decoded, "| hex:", hex);
+            debugOutput.textContent += `Read: decoded="${decoded}", hex=${hex}\n`;
             return decoded; // "1" = success, "0" = failure
         } catch (err) {
-            console.error("Failed to read old password status:", err);
+            debugOutput.textContent += `Read error: ${err}\n`;
             return null;
         }
     }
@@ -163,18 +167,20 @@
             return;
         }
 
+        debugOutput.textContent = ""; // clear previous debug
         const oldData = new TextEncoder().encode(oldPasswordInput.value);
         const newData = new TextEncoder().encode(newPasswordInput.value);
 
         try {
-            // Write old password first, then new password
             await pOldPasswordCharacteristicFound.writeValue(oldData);
             await pNewPasswordCharacteristicFound.writeValue(newData);
 
             // Poll twice to skip first read (returns old password)
             setTimeout(async () => {
+                debugOutput.textContent += "Skipping first read (old password)...\n";
                 await readOldPasswordStatus(); // discard first
                 setTimeout(async () => {
+                    debugOutput.textContent += "Reading actual status...\n";
                     const status = await readOldPasswordStatus(); // real status
                     if (status === "1") {
                         modalMessage.style.color = "green";
@@ -192,6 +198,7 @@
         } catch (err) {
             modalMessage.style.color = "red";
             modalMessage.textContent = "Write failed: " + err;
+            debugOutput.textContent += `Write error: ${err}\n`;
         }
     });
 
@@ -238,9 +245,12 @@
             return bleServer.getPrimaryService(bleService);
         })
         .then(service => Promise.all([
-            service.getCharacteristic(pOldPasswordCharacteristicUUID).then(c => { pOldPasswordCharacteristicFound = c; }),
-            service.getCharacteristic(pNewPasswordCharacteristicUUID).then(c => { pNewPasswordCharacteristicFound = c; }),
-            service.getCharacteristic(pRelaySecureCharacteristicUUID).then(c => { pRelaySecureCharacteristicFound = c; })
+            service.getCharacteristic(pOldPasswordCharacteristicUUID)
+                .then(c => { pOldPasswordCharacteristicFound = c; }),
+            service.getCharacteristic(pNewPasswordCharacteristicUUID)
+                .then(c => { pNewPasswordCharacteristicFound = c; }),
+            service.getCharacteristic(pRelaySecureCharacteristicUUID)
+                .then(c => { pRelaySecureCharacteristicFound = c; })
         ]))
         .then(() => {
             bleStateContainer.innerHTML = "Connected to " + deviceName;
