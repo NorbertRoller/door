@@ -11,7 +11,7 @@
     <p id="status"></p>
     <div class="topnav">
         <h1>BLE Web Application <span id="setupIcon">&#9881;</span></h1>
-        <p style="font-size:0.8em; color:#666;">Version 1.4.W</p>
+        <p style="font-size:0.8em; color:#666;">Version 1.4.V</p>
     </div>
 
     <div class="content">
@@ -50,7 +50,7 @@
                 <button id="cancelPasswordButton">Cancel</button>
             </div>
             <p id="modalMessage" style="color:red; font-size:0.9em;"></p>
-            <p id="modalDebug" style="color:#444; font-size:0.8em;"></p>
+            <p id="modalDebug" style="color:blue; font-size:0.8em;"></p>
         </div>
     </div>
 
@@ -62,7 +62,6 @@
     const offButton = document.getElementById("offButton");
     const bleStateContainer = document.getElementById('bleState');
 
-    // Modal Elements
     const setupIcon = document.getElementById('setupIcon');
     const passwordModal = document.getElementById('passwordModal');
     const oldPasswordInput = document.getElementById('oldPassword');
@@ -85,7 +84,7 @@
     let pNewPasswordCharacteristicFound;
     let pRelaySecureCharacteristicFound;
 
-    // Filter ASCII and max 20 chars
+    // ASCII filter
     function asciiFilter(inputElement) {
         inputElement.value = inputElement.value
             .split('')
@@ -118,16 +117,6 @@
         }
     }
 
-    // Change offButton color dynamically
-    numInput.addEventListener("input", () => {
-        if (numInput.value.length > 0) {
-            offButton.style.backgroundColor = '#007BFF'; // blue
-        } else {
-            offButton.style.backgroundColor = '#5f6c6d'; // dark grey
-        }
-    });
-
-    // Event listeners
     connectButton.addEventListener('click', () => { if (isWebBluetoothEnabled()) connectToDevice(); });
     disconnectButton.addEventListener('click', disconnectDevice);
 
@@ -145,31 +134,38 @@
         newPasswordInput.value = "";
         repeatPasswordInput.value = "";
         sendPasswordButton.disabled = true;
+        resetCancelButton();
         passwordModal.style.display = "block";
     });
 
     cancelPasswordButton.addEventListener('click', () => {
         passwordModal.style.display = "none";
-        numInput.value = "";
-        offButton.style.backgroundColor = '#5f6c6d'; // reset main send button
+        resetCancelButton();
     });
 
-    // Helper: read old password status from ESP32
+    function resetCancelButton() {
+        cancelPasswordButton.textContent = "Cancel";
+        cancelPasswordButton.style.backgroundColor = "";
+        cancelPasswordButton.style.color = "";
+        cancelPasswordButton.style.cursor = "";
+    }
+
     async function readOldPasswordStatus() {
         if (!pOldPasswordCharacteristicFound) return null;
         try {
             const value = await pOldPasswordCharacteristicFound.readValue();
-            const decoded = new TextDecoder().decode(value);
-            const hexArr = Array.from(value).map(b => b.toString(16).padStart(2,'0'));
-            modalDebug.textContent += `Read: decoded="${decoded}", hex=${hexArr.join(' ')}\n`;
-            return decoded.trim();
+            const hex = Array.from(new Uint8Array(value.buffer))
+                .map(b => b.toString(16).padStart(2,'0'))
+                .join(' ');
+            const decoded = new TextDecoder().decode(value).replace(/\0/g,'').trim();
+            modalDebug.innerHTML += `<br>Read: decoded="${decoded}", hex=${hex}`;
+            return decoded;
         } catch (err) {
-            console.error("Failed to read old password status:", err);
+            modalDebug.innerHTML += `<br>Read failed: ${err}`;
             return null;
         }
     }
 
-    // Send password with feedback
     sendPasswordButton.addEventListener('click', async () => {
         if (!pOldPasswordCharacteristicFound || !pNewPasswordCharacteristicFound) {
             modalMessage.style.color = "red";
@@ -180,42 +176,43 @@
         const oldData = new TextEncoder().encode(oldPasswordInput.value);
         const newData = new TextEncoder().encode(newPasswordInput.value);
 
+        modalDebug.innerHTML += `<br>Old password sent: ${oldPasswordInput.value}`;
+        modalDebug.innerHTML += `<br>New password sent: ${newPasswordInput.value}`;
+
         try {
-            // Write old + new password
             await pOldPasswordCharacteristicFound.writeValue(oldData);
             await pNewPasswordCharacteristicFound.writeValue(newData);
-            modalDebug.textContent += `Old password sent: ${oldPasswordInput.value}\nNew password sent: ${newPasswordInput.value}\nSkipping first read (old password)...\n`;
 
-            // Poll twice to skip the first read (old password)
             setTimeout(async () => {
-                await readOldPasswordStatus(); // discard first read
-                modalDebug.textContent += "Reading actual status...\n";
-                const status = await readOldPasswordStatus(); // real status
+                modalDebug.innerHTML += `<br>Skipping first read (old password)...`;
+                await readOldPasswordStatus();
+                setTimeout(async () => {
+                    modalDebug.innerHTML += `<br>Reading actual status...`;
+                    const status = await readOldPasswordStatus();
 
-                if (status === "1") {
-                    modalMessage.style.color = "green";
-                    modalMessage.textContent = "Password update successful!";
-                    cancelPasswordButton.textContent = "Close";
-                    cancelPasswordButton.style.backgroundColor = "green";
-                } else if (status === "0") {
-                    modalMessage.style.color = "red";
-                    modalMessage.textContent = "Old password incorrect!";
-                    cancelPasswordButton.textContent = "Cancel";
-                    cancelPasswordButton.style.backgroundColor = "#d13a30";
-                } else {
-                    modalMessage.style.color = "red";
-                    modalMessage.textContent = "No response from device!";
-                    cancelPasswordButton.textContent = "Cancel";
-                    cancelPasswordButton.style.backgroundColor = "#d13a30";
-                }
-            }, 500); // increased delay for ESP32
+                    if (status === "1") {
+                        modalMessage.style.color = "green";
+                        modalMessage.textContent = "Password update successful!";
+                        // Change Cancel button to Close with green
+                        cancelPasswordButton.textContent = "Close";
+                        cancelPasswordButton.style.backgroundColor = "#24af37";
+                        cancelPasswordButton.style.color = "white";
+                        cancelPasswordButton.style.cursor = "pointer";
+                    } else if (status === "0") {
+                        modalMessage.style.color = "red";
+                        modalMessage.textContent = "Old password incorrect!";
+                    } else {
+                        modalMessage.style.color = "red";
+                        modalMessage.textContent = "No response from device!";
+                    }
+                }, 200);
+            }, 200);
         } catch (err) {
             modalMessage.style.color = "red";
             modalMessage.textContent = "Write failed: " + err;
         }
     });
 
-    // Enhanced write function
     function writeOnCharacteristic(characteristicOrArray, data) {
         if (!characteristicOrArray) return;
         const characteristics = Array.isArray(characteristicOrArray) ? characteristicOrArray : [characteristicOrArray];
@@ -289,8 +286,7 @@
         bleStateContainer.innerHTML = "Device disconnected";
         bleStateContainer.style.color = "#d13a30";
         passwordModal.style.display = "none";
-        numInput.value = "";
-        offButton.style.backgroundColor = '#5f6c6d';
+        resetCancelButton();
         setButtonState(connectButton, true);
         setButtonState(disconnectButton, false);
         setButtonState(offButton, false);
@@ -312,10 +308,10 @@
         }
     }
 
-    // Initialize buttons
     setButtonState(connectButton, true);
     setButtonState(disconnectButton, false);
     setButtonState(offButton, false);
+
 </script>
 </body>
 </html>
