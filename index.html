@@ -11,7 +11,7 @@
     <p id="status"></p>
     <div class="topnav">
         <h1>BLE Web Application <span id="setupIcon">&#9881;</span></h1>
-        <p style="font-size:0.8em; color:#666;">Version 1.4.Q</p>
+        <p style="font-size:0.8em; color:#666;">Version 1.4.Qa</p>
     </div>
 
     <div class="content">
@@ -184,7 +184,7 @@
                     modalMessage.style.color = "red";
                     modalMessage.textContent = "No response from device!";
                 }
-            }, 200);
+            }, 500);
         } catch (err) {
             modalMessage.style.color = "red";
             modalMessage.textContent = "Write failed: " + err;
