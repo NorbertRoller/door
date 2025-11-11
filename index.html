@@ -11,7 +11,7 @@
     <p id="status"></p>
     <div class="topnav">
         <h1>BLE Web Application <span id="setupIcon">&#9881;</span></h1>
-        <p style="font-size:0.8em; color:#666;">Version 1.4.R</p>
+        <p style="font-size:0.8em; color:#666;">Version 1.4.S</p>
     </div>
 
     <div class="content">
@@ -49,9 +49,7 @@
                 <button id="sendPasswordButton" disabled>Send</button>
                 <button id="cancelPasswordButton">Cancel</button>
             </div>
-            <p id="modalMessage" style="color:red; font-size:0.9em;"></p>
-            <!-- Debug output -->
-            <pre id="debugOutput" style="font-size:0.8em; color:blue;"></pre>
+            <pre id="modalMessage" style="color:red; font-size:0.9em;"></pre>
         </div>
     </div>
 
@@ -63,7 +61,6 @@
     const offButton = document.getElementById("offButton");
     const bleStateContainer = document.getElementById('bleState');
 
-    // Modal Elements
     const setupIcon = document.getElementById('setupIcon');
     const passwordModal = document.getElementById('passwordModal');
     const oldPasswordInput = document.getElementById('oldPassword');
@@ -72,7 +69,6 @@
     const sendPasswordButton = document.getElementById('sendPasswordButton');
     const cancelPasswordButton = document.getElementById('cancelPasswordButton');
     const modalMessage = document.getElementById('modalMessage');
-    const debugOutput = document.getElementById('debugOutput');
 
     // BLE Device Specs
     const deviceName = 'BLE2FORD';
@@ -132,7 +128,6 @@
 
     setupIcon.addEventListener('click', () => {
         modalMessage.textContent = "";
-        debugOutput.textContent = "";
         oldPasswordInput.value = "";
         newPasswordInput.value = "";
         repeatPasswordInput.value = "";
@@ -144,22 +139,22 @@
         passwordModal.style.display = "none";
     });
 
-    // Helper: read old password status and show hex/debug
+    // Helper: read old password characteristic
     async function readOldPasswordStatus() {
         if (!pOldPasswordCharacteristicFound) return null;
         try {
             const value = await pOldPasswordCharacteristicFound.readValue();
             const decoded = new TextDecoder().decode(value);
-            const hex = Array.from(value).map(b => b.toString(16).padStart(2,'0')).join(' ');
-            debugOutput.textContent += `Read: decoded="${decoded}", hex=${hex}\n`;
-            return decoded; // "1" = success, "0" = failure
+            const hex = Array.from(value).map(b => b.toString(16).padStart(2, '0')).join(' ');
+            modalMessage.textContent += `Read: decoded="${decoded}", hex=${hex}\n`;
+            return decoded;
         } catch (err) {
-            debugOutput.textContent += `Read error: ${err}\n`;
+            modalMessage.textContent += `Read failed: ${err}\n`;
             return null;
         }
     }
 
-    // Send password with feedback
+    // Send password
     sendPasswordButton.addEventListener('click', async () => {
         if (!pOldPasswordCharacteristicFound || !pNewPasswordCharacteristicFound) {
             modalMessage.style.color = "red";
@@ -167,45 +162,53 @@
             return;
         }
 
-        debugOutput.textContent = ""; // clear previous debug
         const oldData = new TextEncoder().encode(oldPasswordInput.value);
         const newData = new TextEncoder().encode(newPasswordInput.value);
 
         try {
+            // Write old password first
             await pOldPasswordCharacteristicFound.writeValue(oldData);
-            await pNewPasswordCharacteristicFound.writeValue(newData);
+            modalMessage.textContent += `Old password sent: ${oldPasswordInput.value}\n`;
 
-            // Poll twice to skip first read (returns old password)
+            // Then write new password
+            await pNewPasswordCharacteristicFound.writeValue(newData);
+            modalMessage.textContent += `New password sent: ${newPasswordInput.value}\n`;
+
+            // Poll twice to skip the first read (which returns old password)
             setTimeout(async () => {
-                debugOutput.textContent += "Skipping first read (old password)...\n";
+                modalMessage.textContent += "Skipping first read (old password)...\n";
                 await readOldPasswordStatus(); // discard first
+                modalMessage.textContent += "Reading actual status...\n";
                 setTimeout(async () => {
-                    debugOutput.textContent += "Reading actual status...\n";
                     const status = await readOldPasswordStatus(); // real status
                     if (status === "1") {
                         modalMessage.style.color = "green";
-                        modalMessage.textContent = "Password update successful!";
+                        modalMessage.textContent += "Password update successful!\n";
                         setTimeout(() => passwordModal.style.display = "none", 1000);
                     } else if (status === "0") {
                         modalMessage.style.color = "red";
-                        modalMessage.textContent = "Old password incorrect!";
+                        modalMessage.textContent += "Old password incorrect!\n";
                     } else {
                         modalMessage.style.color = "red";
-                        modalMessage.textContent = "No response from device!";
+                        modalMessage.textContent += "No response from device!\n";
                     }
-                }, 200); // short delay for second read
-            }, 500); // initial read delay
+                }, 200);
+            }, 200);
+
         } catch (err) {
             modalMessage.style.color = "red";
-            modalMessage.textContent = "Write failed: " + err;
-            debugOutput.textContent += `Write error: ${err}\n`;
+            modalMessage.textContent += "Write failed: " + err + "\n";
         }
     });
 
     // Enhanced write function
     function writeOnCharacteristic(characteristicOrArray, data) {
         if (!characteristicOrArray) return;
-        const characteristics = Array.isArray(characteristicOrArray) ? characteristicOrArray : [characteristicOrArray];
+
+        const characteristics = Array.isArray(characteristicOrArray)
+            ? characteristicOrArray
+            : [characteristicOrArray];
+
         let promise = Promise.resolve();
         characteristics.forEach(char => {
             promise = promise.then(() => char.writeValue(data)
