@@ -11,7 +11,7 @@
     <p id="status"></p>
     <div class="topnav">
         <h1>BLE Web Application <span id="setupIcon">&#9881;</span></h1>
-        <p style="font-size:0.8em; color:#666;">Version 1.4.Oa</p>
+        <p style="font-size:0.8em; color:#666;">Version 1.4.Q</p>
     </div>
 
     <div class="content">
@@ -140,16 +140,15 @@
         passwordModal.style.display = "none";
     });
 
-    // Helper: read old password status from ESP32 (trim extra chars)
+    // Helper: read old password status from ESP32 with hex debug
     async function readOldPasswordStatus() {
         if (!pOldPasswordCharacteristicFound) return null;
         try {
             const value = await pOldPasswordCharacteristicFound.readValue();
-            const statusRaw = new TextDecoder().decode(value);
-            const status = statusRaw.trim(); // remove padding/old password
-            console.log("Old password status:", status);
-            if (status === "1" || status === "0") return status;
-            return null; // discard unexpected values
+            const decoded = new TextDecoder().decode(value);
+            const hex = Array.from(value).map(b => b.toString(16).padStart(2,'0')).join(' ');
+            console.log("Old password status (decoded):", decoded, "| hex:", hex);
+            return decoded; // "1" = success, "0" = failure
         } catch (err) {
             console.error("Failed to read old password status:", err);
             return null;
@@ -168,10 +167,11 @@
         const newData = new TextEncoder().encode(newPasswordInput.value);
 
         try {
+            // Write old password first, then new password
             await pOldPasswordCharacteristicFound.writeValue(oldData);
             await pNewPasswordCharacteristicFound.writeValue(newData);
 
-            // Poll twice to skip the first read (which returns old password)
+            // Poll twice to skip first read (returns old password)
             setTimeout(async () => {
                 await readOldPasswordStatus(); // discard first
                 setTimeout(async () => {
@@ -187,9 +187,8 @@
                         modalMessage.style.color = "red";
                         modalMessage.textContent = "No response from device!";
                     }
-                }, 500); // short delay for second read
+                }, 200); // short delay for second read
             }, 500); // initial read delay
-
         } catch (err) {
             modalMessage.style.color = "red";
             modalMessage.textContent = "Write failed: " + err;
@@ -199,11 +198,7 @@
     // Enhanced write function
     function writeOnCharacteristic(characteristicOrArray, data) {
         if (!characteristicOrArray) return;
-
-        const characteristics = Array.isArray(characteristicOrArray)
-            ? characteristicOrArray
-            : [characteristicOrArray];
-
+        const characteristics = Array.isArray(characteristicOrArray) ? characteristicOrArray : [characteristicOrArray];
         let promise = Promise.resolve();
         characteristics.forEach(char => {
             promise = promise.then(() => char.writeValue(data)
@@ -243,12 +238,9 @@
             return bleServer.getPrimaryService(bleService);
         })
         .then(service => Promise.all([
-            service.getCharacteristic(pOldPasswordCharacteristicUUID)
-                .then(c => { pOldPasswordCharacteristicFound = c; }),
-            service.getCharacteristic(pNewPasswordCharacteristicUUID)
-                .then(c => { pNewPasswordCharacteristicFound = c; }),
-            service.getCharacteristic(pRelaySecureCharacteristicUUID)
-                .then(c => { pRelaySecureCharacteristicFound = c; })
+            service.getCharacteristic(pOldPasswordCharacteristicUUID).then(c => { pOldPasswordCharacteristicFound = c; }),
+            service.getCharacteristic(pNewPasswordCharacteristicUUID).then(c => { pNewPasswordCharacteristicFound = c; }),
+            service.getCharacteristic(pRelaySecureCharacteristicUUID).then(c => { pRelaySecureCharacteristicFound = c; })
         ]))
         .then(() => {
             bleStateContainer.innerHTML = "Connected to " + deviceName;
@@ -299,7 +291,6 @@
     setButtonState(connectButton, true);
     setButtonState(disconnectButton, false);
     setButtonState(offButton, false);
-
 </script>
 </body>
 </html>
