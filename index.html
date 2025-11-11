@@ -10,8 +10,8 @@
 <body>
     <p id="status"></p>
     <div class="topnav">
-        <h1>BLE Web Application <span id="setupIcon">&#9881;</span></h1>
-        <p style="font-size:0.8em; color:#666;">Version 1.4.X</p>
+        <h1>BLE Web Application <span id="setupIcon">&#128295;</span></h1>
+        <p style="font-size:0.8em; color:#666;">Version 1.4.Xa</p>
     </div>
 
     <div class="content">
@@ -286,6 +286,7 @@
         bleStateContainer.style.color = "#d13a30";
         passwordModal.style.display = "none";
         resetCancelButton();
+		numInput.value = "";  // <-- clear CMD field
         setButtonState(connectButton, true);
         setButtonState(disconnectButton, false);
         setButtonState(offButton, false);
