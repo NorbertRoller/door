@@ -11,7 +11,7 @@
     <p id="status"></p>
     <div class="topnav">
         <h1>BLE Web Application <span id="setupIcon">&#9881;</span></h1>
-        <p style="font-size:0.8em; color:#666;">Version 1.4.P</p>
+        <p style="font-size:0.8em; color:#666;">Version 1.4.O</p>
     </div>
 
     <div class="content">
@@ -42,6 +42,7 @@
     <div id="passwordModal" class="modal">
         <div class="modal-content">
             <h3>Change Password / Cmd</h3>
+            <input id="oldPassword" type="text" placeholder="Old password" maxlength="20">
             <input id="newPassword" type="text" placeholder="New password" maxlength="20">
             <input id="repeatPassword" type="text" placeholder="Repeat new password" maxlength="20">
             <div>
@@ -63,6 +64,7 @@
     // Modal Elements
     const setupIcon = document.getElementById('setupIcon');
     const passwordModal = document.getElementById('passwordModal');
+    const oldPasswordInput = document.getElementById('oldPassword');
     const newPasswordInput = document.getElementById('newPassword');
     const repeatPasswordInput = document.getElementById('repeatPassword');
     const sendPasswordButton = document.getElementById('sendPasswordButton');
@@ -72,13 +74,13 @@
     // BLE Device Specs
     const deviceName = 'BLE2FORD';
     const bleService = 'a1df2491-d1ac-43db-a181-fbfe50a90b16';
+    const pOldPasswordCharacteristicUUID = 'a1df2492-d1ac-43db-a181-fbfe50a90b16';
     const pNewPasswordCharacteristicUUID = 'a1df2493-d1ac-43db-a181-fbfe50a90b16';
-    const pPasswordStatusCharacteristicUUID = 'a1df2492-d1ac-43db-a181-fbfe50a90b16';
     const pRelaySecureCharacteristicUUID = 'a1df2494-d1ac-43db-a181-fbfe50a90b16';
 
     let bleServer;
+    let pOldPasswordCharacteristicFound;
     let pNewPasswordCharacteristicFound;
-    let pPasswordStatusCharacteristicFound;
     let pRelaySecureCharacteristicFound;
 
     // Filter ASCII and max 20 chars
@@ -90,7 +92,7 @@
             .join('');
     }
 
-    [numInput, newPasswordInput, repeatPasswordInput].forEach(el => {
+    [numInput, oldPasswordInput, newPasswordInput, repeatPasswordInput].forEach(el => {
         el.addEventListener("input", () => {
             asciiFilter(el);
             checkNewPasswordMatch();
@@ -127,6 +129,7 @@
 
     setupIcon.addEventListener('click', () => {
         modalMessage.textContent = "";
+        oldPasswordInput.value = "";
         newPasswordInput.value = "";
         repeatPasswordInput.value = "";
         sendPasswordButton.disabled = true;
@@ -137,50 +140,56 @@
         passwordModal.style.display = "none";
     });
 
-    // Helper: read password status from ESP32
-    async function readPasswordStatus() {
-        if (!pPasswordStatusCharacteristicFound) return null;
+    // Helper: read old password status from ESP32 (trim extra chars)
+    async function readOldPasswordStatus() {
+        if (!pOldPasswordCharacteristicFound) return null;
         try {
-            const value = await pPasswordStatusCharacteristicFound.readValue();
-            const status = new TextDecoder().decode(value);
-            console.log("Password status:", status);
-            return status; // "1" = success, "0" = failure
+            const value = await pOldPasswordCharacteristicFound.readValue();
+            const statusRaw = new TextDecoder().decode(value);
+            const status = statusRaw.trim(); // remove padding/old password
+            console.log("Old password status:", status);
+            if (status === "1" || status === "0") return status;
+            return null; // discard unexpected values
         } catch (err) {
-            console.error("Failed to read password status:", err);
+            console.error("Failed to read old password status:", err);
             return null;
         }
     }
 
     // Send password with feedback
     sendPasswordButton.addEventListener('click', async () => {
-        if (!pNewPasswordCharacteristicFound || !pPasswordStatusCharacteristicFound) {
+        if (!pOldPasswordCharacteristicFound || !pNewPasswordCharacteristicFound) {
             modalMessage.style.color = "red";
             modalMessage.textContent = "BLE characteristic not found!";
             return;
         }
 
+        const oldData = new TextEncoder().encode(oldPasswordInput.value);
         const newData = new TextEncoder().encode(newPasswordInput.value);
 
         try {
-            // Write new password
+            await pOldPasswordCharacteristicFound.writeValue(oldData);
             await pNewPasswordCharacteristicFound.writeValue(newData);
 
-            // Wait briefly, then read status twice
+            // Poll twice to skip the first read (which returns old password)
             setTimeout(async () => {
-                await readPasswordStatus(); // discard first read
-                const status = await readPasswordStatus(); // real read
-                if (status === "1") {
-                    modalMessage.style.color = "green";
-                    modalMessage.textContent = "Password update successful!";
-                    setTimeout(() => passwordModal.style.display = "none", 1000);
-                } else if (status === "0") {
-                    modalMessage.style.color = "red";
-                    modalMessage.textContent = "Password update failed!";
-                } else {
-                    modalMessage.style.color = "red";
-                    modalMessage.textContent = "No response from device!";
-                }
-            }, 300);
+                await readOldPasswordStatus(); // discard first
+                setTimeout(async () => {
+                    const status = await readOldPasswordStatus(); // real status
+                    if (status === "1") {
+                        modalMessage.style.color = "green";
+                        modalMessage.textContent = "Password update successful!";
+                        setTimeout(() => passwordModal.style.display = "none", 1000);
+                    } else if (status === "0") {
+                        modalMessage.style.color = "red";
+                        modalMessage.textContent = "Old password incorrect!";
+                    } else {
+                        modalMessage.style.color = "red";
+                        modalMessage.textContent = "No response from device!";
+                    }
+                }, 200); // short delay for second read
+            }, 200); // initial read delay
+
         } catch (err) {
             modalMessage.style.color = "red";
             modalMessage.textContent = "Write failed: " + err;
@@ -190,7 +199,11 @@
     // Enhanced write function
     function writeOnCharacteristic(characteristicOrArray, data) {
         if (!characteristicOrArray) return;
-        const characteristics = Array.isArray(characteristicOrArray) ? characteristicOrArray : [characteristicOrArray];
+
+        const characteristics = Array.isArray(characteristicOrArray)
+            ? characteristicOrArray
+            : [characteristicOrArray];
+
         let promise = Promise.resolve();
         characteristics.forEach(char => {
             promise = promise.then(() => char.writeValue(data)
@@ -230,10 +243,10 @@
             return bleServer.getPrimaryService(bleService);
         })
         .then(service => Promise.all([
+            service.getCharacteristic(pOldPasswordCharacteristicUUID)
+                .then(c => { pOldPasswordCharacteristicFound = c; }),
             service.getCharacteristic(pNewPasswordCharacteristicUUID)
                 .then(c => { pNewPasswordCharacteristicFound = c; }),
-            service.getCharacteristic(pPasswordStatusCharacteristicUUID)
-                .then(c => { pPasswordStatusCharacteristicFound = c; }),
             service.getCharacteristic(pRelaySecureCharacteristicUUID)
                 .then(c => { pRelaySecureCharacteristicFound = c; })
         ]))
@@ -286,6 +299,7 @@
     setButtonState(connectButton, true);
     setButtonState(disconnectButton, false);
     setButtonState(offButton, false);
+
 </script>
 </body>
 </html>
