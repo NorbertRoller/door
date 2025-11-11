@@ -11,7 +11,7 @@
     <p id="status"></p>
     <div class="topnav">
         <h1>BLE Web Application <span id="setupIcon">&#9881;</span></h1>
-        <p style="font-size:0.8em; color:#666;">Version 1.4.V</p>
+        <p style="font-size:0.8em; color:#666;">Version 1.4.W</p>
     </div>
 
     <div class="content">
@@ -100,6 +100,19 @@
         });
     });
 
+    // Change main Send button color dynamically
+    numInput.addEventListener("input", () => {
+        if (numInput.value.length > 0) {
+            offButton.style.backgroundColor = '#007BFF'; // blue
+            offButton.style.color = 'white';
+            offButton.style.cursor = 'pointer';
+        } else {
+            offButton.style.backgroundColor = '#5f6c6d'; // dark grey
+            offButton.style.color = 'white';
+            offButton.style.cursor = 'default';
+        }
+    });
+
     function checkNewPasswordMatch() {
         const newVal = newPasswordInput.value;
         const repVal = repeatPasswordInput.value;
@@ -140,6 +153,10 @@
 
     cancelPasswordButton.addEventListener('click', () => {
         passwordModal.style.display = "none";
+        numInput.value = ""; // clear cmd input after modal
+        offButton.style.backgroundColor = '#5f6c6d'; // reset to dark grey
+        offButton.style.color = 'white';
+        offButton.style.cursor = 'default';
         resetCancelButton();
     });
 
@@ -193,7 +210,6 @@
                     if (status === "1") {
                         modalMessage.style.color = "green";
                         modalMessage.textContent = "Password update successful!";
-                        // Change Cancel button to Close with green
                         cancelPasswordButton.textContent = "Close";
                         cancelPasswordButton.style.backgroundColor = "#24af37";
                         cancelPasswordButton.style.color = "white";
