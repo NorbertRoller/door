@@ -11,7 +11,7 @@
     <p id="status"></p>
     <div class="topnav">
         <h1>BLE Web Application <span id="setupIcon">&#9881;</span></h1>
-        <p style="font-size:0.8em; color:#666;">Version 1.4.P</p>
+        <p style="font-size:0.8em; color:#666;">Version 1.4.Q</p>
     </div>
 
     <div class="content">
@@ -140,12 +140,12 @@
         passwordModal.style.display = "none";
     });
 
-    // Helper: read old password status from ESP32
+    // Helper: read old password status from ESP32 (only status, not password)
     async function readOldPasswordStatus() {
         if (!pOldPasswordCharacteristicFound) return null;
         try {
             const value = await pOldPasswordCharacteristicFound.readValue();
-            const status = new TextDecoder().decode(value).trim();
+            const status = new TextDecoder().decode(value);
             console.log("Old password status:", status);
             return status; // "1" = success, "0" = failure
         } catch (err) {
@@ -166,31 +166,25 @@
         const newData = new TextEncoder().encode(newPasswordInput.value);
 
         try {
-            // Send old password first
+            // Write old and new password
             await pOldPasswordCharacteristicFound.writeValue(oldData);
-            // Send new password
             await pNewPasswordCharacteristicFound.writeValue(newData);
 
-            // Read status once after short delay
+            // Poll status after small delay
             setTimeout(async () => {
-                try {
-                    const status = await readOldPasswordStatus();
-                    if (status === "1") {
-                        modalMessage.style.color = "green";
-                        modalMessage.textContent = "Password update successful!";
-                        setTimeout(() => passwordModal.style.display = "none", 1000);
-                    } else if (status === "0") {
-                        modalMessage.style.color = "red";
-                        modalMessage.textContent = "Old password incorrect!";
-                    } else {
-                        modalMessage.style.color = "red";
-                        modalMessage.textContent = "No response from device!";
-                    }
-                } catch (err) {
+                const status = await readOldPasswordStatus();
+                if (status === "1") {
+                    modalMessage.style.color = "green";
+                    modalMessage.textContent = "Password update successful!";
+                    setTimeout(() => passwordModal.style.display = "none", 1000);
+                } else if (status === "0") {
                     modalMessage.style.color = "red";
-                    modalMessage.textContent = "Read failed: " + err;
+                    modalMessage.textContent = "Old password incorrect!";
+                } else {
+                    modalMessage.style.color = "red";
+                    modalMessage.textContent = "No response from device!";
                 }
-            }, 200); // 200ms delay
+            }, 200);
         } catch (err) {
             modalMessage.style.color = "red";
             modalMessage.textContent = "Write failed: " + err;
@@ -300,6 +294,7 @@
     setButtonState(connectButton, true);
     setButtonState(disconnectButton, false);
     setButtonState(offButton, false);
+
 </script>
 </body>
 </html>
